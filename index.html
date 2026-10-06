@@ -147,6 +147,14 @@ table.list{width:100%;border-collapse:collapse;font-size:.85rem}
 .mailbox{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-left:auto}
 .mailbox .field.inline input{width:230px}
 .primary.alt{background:var(--blue)}
+
+.backup{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end;margin:0 0 12px;font-size:.82rem;color:var(--muted)}
+.backup span{margin-right:auto}
+.backup .btn-s{display:inline-block;width:auto;margin:0}
+.notes{width:100%;font:inherit;font-size:.95rem;padding:10px;border:1px solid var(--line);border-radius:6px;background:#F7F9FC;resize:vertical}
+.notes:focus{outline:2px solid var(--blue);background:#fff}
+.field.grund{flex-basis:100%}
+.list .tag.note{background:#FFF3D6;color:#7A5300;cursor:help}
 </style>
 </head><body><div id="root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -249,7 +257,8 @@ table.list{width:100%;border-collapse:collapse;font-size:.85rem}
       if (ded > 0 && mode === 'teil') b = Math.min(Math.max(n(inp['gsb_' + k]), 0), ded);
       b = r2(b);
       return { row: 'k_' + k, key: k, label: KORR_LABELS[i], betrag: b, abzug: ded,
-        note: b ? (mode === 'voll' ? 'Kulanz: volle Gutschrift' : `Kulanz: Teilgutschrift ${eur(b)} von ${eur(ded)}`) : '' };
+        grund: String(inp['gsr_' + k] || '').trim(),
+        note: b ? (mode === 'voll' ? 'Kulanz: volle Gutschrift' : `Kulanz: Teilgutschrift ${eur(b)} von ${eur(ded)}`) + (String(inp['gsr_' + k] || '').trim() ? ' – ' + String(inp['gsr_' + k]).trim() : '') : '' };
     });
     const ksT = String(inp.korrSonstText || '').trim();
     korr.push({ row: 'k_sonst', key: 'sonst', label: KORR_LABELS[5] + (ksT ? ': ' + ksT : ''), betrag: r2(n(inp.korrSonst)), note: '' });
@@ -915,6 +924,10 @@ function Editor({ inp, R, onPatch, onReset, onBack, onXlsx, onPdf, busy, importe
               <Field label="Vor- und Nachname (Vereinbarung)" type="text" value={inp.vollerName} onChange={up('vollerName')} />
             </div>
           </div>
+          <div className="card">
+            <h2>Notizen zum Gespräch (intern, nicht im PDF)</h2>
+            <textarea className="notes" rows={4} value={inp.notiz ?? ''} placeholder="Was wurde besprochen, warum Kulanz, Vereinbarungen …" onChange={e => onPatch({ notiz: e.target.value })} />
+          </div>
           <div className="card special">
             <h2>Sonderprovision</h2>
             <div className="grid two">
@@ -958,6 +971,7 @@ function Editor({ inp, R, onPatch, onReset, onBack, onXlsx, onPdf, busy, importe
                     <label className="check"><input type="checkbox" disabled={!(k.abzug > 0)} checked={mode === 'teil'} onChange={() => set('teil')} /> Gutschrift mit Teilzahlung</label>
                     {mode === 'teil' && k.abzug > 0 && <label className="field inline"><span>Betrag €</span><input type="number" inputMode="decimal" value={inp['gsb_' + k.key] ?? ''} onChange={e => onPatch({ ['gsb_' + k.key]: e.target.value })} /></label>}
                     {k.betrag > 0 && <span className="gsres">+ {eur(k.betrag)}</span>}
+                    {mode && k.abzug > 0 && <label className="field grund"><span>Begründung (erscheint im PDF)</span><input type="text" value={inp['gsr_' + k.key] ?? ''} placeholder="z. B. Systemausfall Pencil Selling, mit MA besprochen am …" onChange={e => onPatch({ ['gsr_' + k.key]: e.target.value })} /></label>}
                   </div>);
               })}
             </div>
@@ -993,6 +1007,7 @@ function App() {
   const [drag, setDrag] = useState(false);
   const fileRef = useRef();
   const telRef = useRef();
+  const bakRef = useRef();
   useEffect(() => save('provi_rules', R), [R]);
   useEffect(() => save('provi_data', data), [data]);
   useEffect(() => save('provi_meta', meta), [meta]);
@@ -1026,7 +1041,7 @@ function App() {
       const res0 = calc(inp, R);
       const credited = id => { const qx = res0.qual.find(q => q.row === id); const k = res0.korr.find(c => c.key === id); return !!(qx && k && qx.betrag < 0 && k.betrag >= -qx.betrag); };
       const todoF = todo.filter(t => !((t.startsWith('Werbeversprechen') && credited('werb')) || (t.startsWith('Pencil') && credited('pencil')) || (t.startsWith('Telefonie') && credited('marketing'))));
-      return { e, row, inp, include, todo: todoF, tel, credited, edited: !!(o.fields && Object.keys(o.fields).some(k => !['sonderBetrag', 'sonderText', 'slZiel', 'slIst'].includes(k))), res: res0 };
+      return { e, row, inp, include, todo: todoF, tel, credited, edited: !!(o.fields && Object.keys(o.fields).some(k => !['sonderBetrag', 'sonderText', 'slZiel', 'slIst', 'notiz'].includes(k))), res: res0 };
     });
   }, [data, meta, ov, R, slSet, tzSet]);
   const chosen = list.filter(x => x.include);
@@ -1076,6 +1091,7 @@ function App() {
 
   async function buildZip() {
       const zip = new JSZip();
+      zip.file(backupName(), JSON.stringify(backupObj(), null, 1));
       for (const x of chosen) {
         zip.file('PDF/' + fname(x.inp, 'pdf'), buildPdf(window.jspdf.jsPDF, x.inp, R).output('arraybuffer'));
         const { buffer } = await buildXlsx(ExcelJS, null, x.inp, R);
@@ -1092,6 +1108,28 @@ function App() {
       ['G', 'H', 'I', 'J', 'L'].forEach(c => ws.getColumn(c).numFmt = '#,##0.00 "€"');
       zip.file(`Uebersicht_${safe(meta.monat)}_${meta.jahr}.xlsx`, await wb.xlsx.writeBuffer());
       return zip.generateAsync({ type: 'uint8array' });
+  }
+  const backupObj = () => ({ app: 'hetec-provisionsabrechnung', version: 1, erstellt: new Date().toISOString(), data, meta, ov, slSet, tzSet, R, manual });
+  const backupName = () => `Sicherung_Provision_${safe(meta.monat)}_${meta.jahr}_${new Date().toISOString().slice(0, 10)}.json`;
+  function saveBackup() {
+    download(new Blob([JSON.stringify(backupObj(), null, 1)], { type: 'application/json' }), backupName());
+    setMsg('Sicherung gespeichert. Mit „Sicherung laden“ stellst du später alles wieder her, auch auf einem anderen Gerät.');
+  }
+  async function loadBackup(file) {
+    try {
+      const b = JSON.parse(await file.text());
+      if (b.app !== 'hetec-provisionsabrechnung') throw new Error('Keine Sicherung dieser App.');
+      if (!confirm(`Sicherung vom ${new Date(b.erstellt).toLocaleString('de-DE')} (${b.meta?.monat || ''} ${b.meta?.jahr || ''}) laden? Der aktuelle Stand wird ersetzt.`)) return;
+      if (b.data !== undefined) setData(b.data);
+      if (b.meta) setMeta(b.meta);
+      if (b.ov) setOv(b.ov);
+      if (b.slSet) setSlSet(b.slSet);
+      if (b.tzSet) setTzSet(b.tzSet);
+      if (b.R) setR({ ...DEFAULT_RULES, ...b.R });
+      if (b.manual) setManual(b.manual);
+      setEdit(null);
+      setMsg(`Sicherung „${file.name}“ geladen.`);
+    } catch (e) { setMsg('Sicherung konnte nicht geladen werden: ' + e.message); }
   }
   const zipName = () => `Provisionen_${safe(meta.monat)}_${meta.jahr}.zip`;
 
@@ -1192,6 +1230,12 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
   return (
     <div className="wrap">
       <Header />
+      <div className="backup">
+        <span>Sicherung: alle Werte, Kulanzen, Begründungen und Notizen</span>
+        <button className="btn-s" onClick={saveBackup} disabled={!data}>Sicherung speichern</button>
+        <button className="btn-s" onClick={() => bakRef.current.click()}>Sicherung laden</button>
+        <input ref={bakRef} type="file" accept=".json,application/json" hidden onChange={e => { const f = e.target.files[0]; if (f) loadBackup(f); e.target.value = ''; }} />
+      </div>
       <div
         className={'drop' + (drag ? ' over' : '')}
         onDragOver={e => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
@@ -1255,6 +1299,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
                           <label className="tgl"><input type="checkbox" checked={!!i.teilzeit} onChange={ev => patchSl(x.e.sheet, { teilzeit: ev.target.checked })} />Azubi/TZ</label>
                           <label className="tgl"><input type="checkbox" checked={!!i.shopleiter} onChange={ev => patchSl(x.e.sheet, { shopleiter: ev.target.checked })} />Shopleiter</label>
                           {x.edited && <small className="tag">bearbeitet</small>}
+                          {x.inp.notiz && <small className="tag note" title={x.inp.notiz}>Notiz</small>}
                           {!x.row.active && <small className="tag">keine Werte</small>}
                         </span>
                         {(() => {
@@ -1305,7 +1350,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
           </div>
           <div className="gen">
             <button className="primary" onClick={generateAll} disabled={!!busy || !chosen.length}>{busy === 'zip' ? 'Erstelle Abrechnungen …' : `Provision generieren (${chosen.length})`}</button>
-            <small>ZIP mit PDF und Excel je Mitarbeiter plus Übersicht.</small>
+            <small>ZIP mit PDF und Excel je Mitarbeiter, Übersicht und Sicherung.</small>
             <div className="mailbox">
               <label className="field inline"><span>Empfänger</span><input type="email" value={meta.mailTo || ''} placeholder="name@firma.de" onChange={e => setMeta(m => ({ ...m, mailTo: e.target.value }))} /></label>
               <button className="primary alt" onClick={sendMail} disabled={!!busy || !chosen.length}>{busy === 'mail' ? 'Erstelle E-Mail …' : 'Provisionen per E-Mail senden'}</button>
