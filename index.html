@@ -1134,8 +1134,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
   const bg = k % 2 ? 'background:#F2F4F8;' : ''; return `<tr><td style="${td}${bg}">${esc(vn)}</td><td style="${td}${bg}">${esc(nn)}</td><td style="${td}${bg}text-align:right">${esc(eur(x.res.total))}</td></tr>`; }).join('\n')}
 <tr><td colspan="2" style="${td}font-weight:bold;background:#E8EEFF">Gesamt (${chosen.length} Mitarbeiter)</td><td style="${td}font-weight:bold;text-align:right;background:#E8EEFF">${esc(eur(sumAll))}</td></tr>
 </table>
-<p>Die Abrechnungen (PDF und Excel) sowie die Übersicht liegen als ZIP im Anhang.</p><p>Viele Grüße</p><script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
-</body></html>`;
+<p>Die Abrechnungen (PDF und Excel) sowie die Übersicht liegen als ZIP im Anhang.</p><p>Viele Grüße</p><\/body><\/html>`;
       const eml = [
         `To: ${meta.mailTo || ''}`,
         `Subject: =?UTF-8?B?${b64(utf8(subject))}?=`,
