@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Provisionsabrechnung</title>
+<meta name="theme-color" content="#0A1F44">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Provision">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&display=swap" rel="stylesheet">
+<style>:root{--ink:#0A1F44;--blue:#1450F5;--bg:#E9EDF3;--paper:#fff;--muted:#5F6A7D;--line:#D3D9E3;--ok:#0E7A4B;--no:#C2362B;color-scheme:light}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:1360px;margin:0 auto;padding:24px 16px 48px}
+header h1{font-size:2rem;font-weight:700;margin:0;letter-spacing:-.01em}
+header p{margin:4px 0 20px;color:var(--muted)}
+main{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:20px;align-items:start}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px}
+.card h2{font-size:1rem;margin:0 0 12px;font-weight:600}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.rules{margin:14px 0 8px}
+.field{display:flex;flex-direction:column;gap:4px;font-size:.82rem;color:var(--muted)}
+.field input,.field select{font:inherit;font-size:1rem;color:var(--ink);padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:#F7F9FC;font-variant-numeric:tabular-nums;width:100%}
+.field input:focus,.field select:focus{outline:2px solid var(--blue);outline-offset:1px;background:#fff}
+button{font:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.link{background:none;border:0;color:var(--blue);padding:0;font-weight:600}
+.ghost{background:none;border:1px solid var(--line);border-radius:6px;padding:8px 14px;color:var(--muted)}
+.sheet{position:sticky;top:16px;background:var(--paper);border-top:6px solid var(--ink);border-radius:4px 4px 10px 10px;padding:18px;box-shadow:0 1px 0 var(--line)}
+.sheethead{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.sheethead small{display:block;color:var(--muted);font-size:.75rem}
+.sheethead strong{font-size:1.1rem}
+.quotes{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.quotes span{font-size:.8rem;padding:3px 8px;border-radius:4px;background:#EEF1F6;font-variant-numeric:tabular-nums}
+.quotes .ok{background:#E2F3EA;color:var(--ok)}.quotes .no{background:#FBE7E5;color:var(--no)}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+td{padding:7px 0;border-bottom:1px solid #EEF1F6;vertical-align:top}
+td small{display:block;color:var(--muted);font-size:.75rem;margin-top:1px}
+.amt{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600;padding-left:10px}
+tr.zero td{color:#9AA3B2}tr.zero .amt{font-weight:400}
+tr.sum td{font-weight:700;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink)}
+tr.neg .amt{color:var(--no)}tr.pos .amt{color:var(--ok)}
+.total{margin-top:16px;padding:14px 0 6px;display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;border-top:3px double var(--ink)}
+.total span{font-weight:600}
+.total strong{font-size:2.4rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.total em{flex-basis:100%;text-align:right;color:var(--muted);font-size:.8rem}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.actions button{background:var(--ink);color:#fff;border:0;border-radius:6px;padding:12px;font-weight:600}
+.actions button+button{background:var(--blue)}
+.actions button:disabled{opacity:.6;cursor:wait}
+.err{color:var(--no);font-size:.85rem}
+@media (max-width:900px){main{grid-template-columns:1fr}.sheet{position:static}}
+.bar{display:flex;gap:16px;align-items:center;margin-bottom:14px}
+.drop{border:2px dashed #9AAAC4;border-radius:10px;background:var(--paper);padding:26px 18px;text-align:center;cursor:pointer;margin-bottom:12px;display:flex;flex-direction:column;gap:4px}
+.drop.over,.drop:hover{border-color:var(--blue);background:#F2F6FF}
+.drop:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.drop span{color:var(--muted);font-size:.9rem}
+.msg{margin:0 0 12px;font-size:.9rem;color:var(--ink)}
+.empty{color:var(--muted)}
+.meta{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.two{grid-template-columns:140px 1fr}
+.special{border-left:4px solid var(--blue)}
+.tablecard{padding:0;overflow:hidden}
+.tablehead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;padding:16px 16px 8px}
+.tablehead h2{margin:0;font-size:1.25rem}
+.tablehead span{color:var(--muted);font-size:.9rem}.tablehead b{color:var(--ink);font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+table.list{width:100%;border-collapse:collapse;font-size:.85rem}
+.list th{text-align:left;font-weight:600;font-size:.78rem;color:var(--muted);padding:8px 8px;border-bottom:2px solid var(--ink);white-space:nowrap}
+.list td{padding:8px;border-bottom:1px solid #E4E8EF;vertical-align:top;font-variant-numeric:tabular-nums}
+.list .r{text-align:right;white-space:nowrap}
+.list tr.off td{color:#9AA3B2}
+.list .who strong{display:block}
+.list .who small{display:inline-block;margin:3px 4px 0 0;font-size:.7rem;padding:1px 6px;border-radius:4px}
+.list .warn{background:#FFF3D6;color:#7A5300}
+.list .tag{background:#E8EEFF;color:var(--blue)}
+.total-cell{font-weight:700}
+.acts{white-space:nowrap}.acts .link{margin-right:10px}
+.mini{font:inherit;width:90px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#F7F9FC}
+.mini.wide{width:200px}
+.mini:focus{outline:2px solid var(--blue);background:#fff}
+.gen{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:16px;border-top:1px solid var(--line);background:#F7F9FC}
+.gen small{color:var(--muted)}
+.primary{background:var(--ink);color:#fff;border:0;border-radius:6px;padding:13px 22px;font-weight:700;font-size:1rem}
+.primary:disabled{opacity:.5;cursor:not-allowed}
+
+.list td{white-space:nowrap}
+.list td.who{white-space:normal;min-width:200px}
+.list .who strong{display:block}
+.list .who .miss{display:block;background:none;padding:0;margin:2px 0 0;color:var(--muted)}
+
+.drop.small{padding:14px 18px;flex-direction:row;flex-wrap:wrap;justify-content:center;gap:10px;align-items:baseline;border-style:dashed}
+.list .who .todo{display:block;background:none;padding:0;margin:2px 0 0;color:var(--no);font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--no);margin-right:6px;vertical-align:middle}
+
+.check{display:inline-flex;align-items:center;gap:6px;font-weight:600;cursor:pointer}
+.list .check{font-weight:400}
+.grid.sl{margin-top:12px}
+.slres{grid-column:1/-1;margin:0;color:var(--muted)}.slres b{color:var(--ok)}
+.list tr.hassl td{border-bottom:0}
+.list tr.slrow td{padding-top:0;background:#F6F8FC}
+.slline{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:.82rem;color:var(--muted);padding:6px 0 4px}
+.slline strong{color:var(--ink)}.slline b{color:var(--ok)}
+.mini.xs{width:56px}
+
+.gslist{display:flex;flex-direction:column;gap:0}
+.gsrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:10px 0;border-bottom:1px solid #EEF1F6}
+.gsrow.none{opacity:.55}
+.gsname{min-width:170px}.gsname small{display:block;color:var(--muted);font-size:.78rem}
+.gsrow .check{font-weight:400;font-size:.9rem}
+.field.inline{flex-direction:row;align-items:center;gap:6px}.field.inline input{width:110px}
+.gsres{margin-left:auto;color:var(--ok);font-weight:700;font-variant-numeric:tabular-nums}
+
+.rulegroup{margin-top:16px}.rulegroup h3{font-size:.85rem;margin:0 0 6px;color:var(--ink)}
+.rulegroup .rules{margin:0}
+
+.list th,.list td{padding:8px 6px}
+.list .n{text-align:right;width:1%}
+.list th.n{text-align:right}
+.list td.cb{white-space:nowrap;width:1%}
+.toggles{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin-top:3px}
+.tgl{display:inline-flex;align-items:center;gap:4px;font-size:.74rem;color:var(--muted);cursor:pointer}
+.tgl input{margin:0}
+.list td.sp{white-space:normal;width:150px}
+.list td.sp .mini{display:block;width:100%;margin-bottom:4px;padding:5px 7px;font-size:.82rem}
+.list td.pay{width:1%}
+.list td.pay strong{display:block;font-size:.98rem}
+.list td.pay small{display:block;color:var(--muted);font-size:.72rem;font-weight:400}
+.list td.acts{width:1%;white-space:nowrap}
+.btn-s{display:block;width:100%;margin-bottom:4px;background:#fff;border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:.8rem;font-weight:600;color:var(--blue)}
+.btn-s:hover{border-color:var(--blue)}
+.btn-s:disabled{opacity:.5}
+.wrap{max-width:1440px}
+
+.abz{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.chip{font-size:.72rem;padding:2px 7px;border-radius:4px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip.neg{background:#FBE7E5;color:var(--no)}
+.chip.done{background:#E2F3EA;color:var(--ok);text-decoration:none}
+.list td.bad{color:var(--no);font-weight:700}
+
+.mailbox{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-left:auto}
+.mailbox .field.inline input{width:230px}
+.primary.alt{background:var(--blue)}
+</style>
+</head><body><div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>(function (root) {
+  const RULES_VERSION = 2;
+  const DEFAULT_RULES = {
+    ppSchwelle: 6, ppBetrag: 20,
+    ksAb: 4, ksBetrag: 15,
+    dslSchwelle: 3, dslBetragNiedrig: 15, dslBetragHoch: 30, dslSoll: 0.15,
+    dslVvlBetrag: 10,
+    vvlSchwelle: 10, vvlBetrag: 5,
+    zubSchwelle: 50, zubAnteil: 0.5,
+    fhBetrag: 20,
+    abwBetrag: 10,
+    abzug: 0.25,
+    werbSoll: 0.85, pencilSoll: 0.75, marketingSoll: 200,
+    tvSoll: 6, osSoll: 11, tvSollTZ: 3, osSollTZ: 11,
+    msySoll: 0.85, msyBonus: 100,
+    fix: 250
+  };
+
+  const KORR_LABELS = ['Korrektur Werbeversprechen', 'Korrektur PS', 'Korrektur Marketing', 'Korrektur o2 TV', 'Korrektur Online-Schutz', 'Sonstige Korrektur'];
+  const GS = [['werb', 'werb'], ['pencil', 'pencil'], ['marketing', 'marketing'], ['tv', 'tv'], ['os', 'os']];
+
+  const n = v => { const x = parseFloat(String(v ?? '').replace(',', '.')); return isFinite(x) ? x : 0; };
+  const pct = v => n(v) / 100;
+  const r2 = v => Math.round((v + (v >= 0 ? 1e-9 : -1e-9)) * 100) / 100;
+  const pf = v => (Math.round(v * 1000) / 10).toLocaleString('de-DE') + ' %';
+  const eur = v => v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  const e0 = v => (Number.isInteger(v) ? v.toLocaleString('de-DE') + ',-' : v.toLocaleString('de-DE', { minimumFractionDigits: 2 })) + ' €';
+  const nf = v => (Math.round(v * 10) / 10).toLocaleString('de-DE');
+  const strip = s => String(s).replace(/\*\*/g, '');
+
+  function regularien(R) {
+    return [
+      `Sollten die Qualitätsziele von dem Mitarbeiter nicht erreicht werden, wird je Qualitätsziel, welches nicht erreicht wird, ${pf(R.abzug)} von der Provisionssumme abgezogen.`,
+      `Qualitätsziele o2 TV und Online-Schutz je Monat (anteilig nach Arbeitstagen): Vollzeit ${R.tvSoll} TV und ${R.osSoll} Online-Schutz, Azubis/Teilzeit ${R.tvSollTZ} TV und ${R.osSollTZ} Online-Schutz.`,
+      `Wenn der Mitarbeiter einen MSY Wert größer ${pf(R.msySoll)} erreicht, gibt es einmalig ${eur(R.msyBonus)} für den Mitarbeiter.`,
+      `Der Mitarbeiter erhält ${eur(R.ppBetrag)} je o2 Postpaid-Neuvertrag größer ${R.ppSchwelle} Stück.`,
+      `Wenn die DSL-Quote größer ${pf(R.dslSoll)} ist, erhält der Mitarbeiter ${eur(R.dslBetragHoch)} je DSL-Neuvertrag größer ${R.dslSchwelle} Stück, sonst ${eur(R.dslBetragNiedrig)} je DSL-Neuvertrag größer ${R.dslSchwelle} Stück. DSL-Quote = DSL-Neuverträge / (Postpaid „normal“ + VVL).`,
+      `Der Mitarbeiter erhält je Urlaubstag und Krankheitstag ${eur(R.abwBetrag)} Provisionsauszahlung.`,
+      'Mündliche Nebenabreden zu dieser Abrechnung bestehen nicht. Jede Änderung der Abrechnung muss schriftlich vereinbart werden.',
+      `FIXPROVISION: Der Mitarbeiter erhält mindestens ${eur(R.fix)} PROVISION FIX pro Monat, auch wenn die Provisionszahlung aus Vertriebszahlen und Qualitätszielen nicht erreicht wird.`
+    ];
+  }
+
+  function calc(inp, R) {
+    const po = n(inp.po), kombi = n(inp.kombi), kombiData = n(inp.kombiData), vvl = n(inp.vvl);
+    const dsl = n(inp.dsl), dslVvl = n(inp.dslVvl), schutzOnline = n(inp.schutzOnline), tv = n(inp.tv);
+    const handys = n(inp.handys), ks = n(inp.ks), marge = n(inp.zubMarge);
+    const urlaub = n(inp.urlaub), krank = n(inp.krank), fh = n(inp.fachhandel);
+    const at = inp.arbeitstage === '' || inp.arbeitstage == null ? 25 : n(inp.arbeitstage);
+    const von = inp.arbeitstageVon === '' || inp.arbeitstageVon == null ? 25 : n(inp.arbeitstageVon);
+    const basis = po + vvl;
+    const q = {
+      poGes: po + kombi + kombiData,
+      ks: handys > 0 ? ks / handys : 0,
+      dsl: basis > 0 ? dsl / basis : 0,
+      anteil: von > 0 ? at / von : 1
+    };
+    const p = v => Math.round(v * 100) + ' %';
+    const dslRel = Math.max(dsl - R.dslSchwelle, 0), dslOk = q.dsl > R.dslSoll;
+    const rows = [
+      { row: 'pp', rich: `o2 **Postpaid** (Voice/Data) **größer ${R.ppSchwelle} Stück**`, quote: null, ist: q.poGes, rel: Math.max(q.poGes - R.ppSchwelle, 0), betrag: R.ppBetrag, dform: c => `MAX(${c}-${R.ppSchwelle},0)` },
+      { row: 'ks', rich: `Komplettschutz ab der ${R.ksAb}. Versicherung ${R.ksBetrag}€`, quote: q.ks, ist: ks, rel: Math.max(ks - (R.ksAb - 1), 0), betrag: R.ksBetrag, dform: c => `MAX(${c}-${R.ksAb - 1},0)` },
+      { row: 'dsl1', rich: `je **o2 DSL** Neuvertrag **größer ${R.dslSchwelle} Stück**, DSL-Quote bis ${p(R.dslSoll)}`, quote: q.dsl, ist: dsl, rel: dslOk ? 0 : dslRel, betrag: R.dslBetragNiedrig, dform: (c, b) => `IF(${b}>${R.dslSoll},0,MAX(${c}-${R.dslSchwelle},0))` },
+      { row: 'dsl2', rich: `je **o2 DSL** Neuvertrag **größer ${R.dslSchwelle} Stück** & **größer ${p(R.dslSoll)}** DSL-Quote`, quote: q.dsl, ist: dsl, rel: dslOk ? dslRel : 0, betrag: R.dslBetragHoch, dform: (c, b) => `IF(${b}>${R.dslSoll},MAX(${c}-${R.dslSchwelle},0),0)` },
+      { row: 'dslvvl', rich: `je **O2 DSL VVL ab der ersten**`, quote: null, ist: dslVvl, rel: dslVvl, betrag: R.dslVvlBetrag, dform: c => c },
+      { row: 'vvl', rich: `o2 **VVL** größer **${R.vvlSchwelle} Stück**`, quote: null, ist: vvl, rel: Math.max(vvl - R.vvlSchwelle, 0), betrag: R.vvlBetrag, dform: c => `MAX(${c}-${R.vvlSchwelle},0)` },
+      { row: 'zub', rich: `jeder Euro Zubehör Marge **größer ${e0(R.zubSchwelle)} Zubehör Marge** wird mit ${Math.round(R.zubAnteil * 100)}% Provision vergütet`, quote: null, ist: marge, rel: marge > R.zubSchwelle ? (marge - R.zubSchwelle) * R.zubAnteil : 0, betrag: 1, euro: true, dform: c => `IF(${c}>${R.zubSchwelle},(${c}-${R.zubSchwelle})*${R.zubAnteil},0)` },
+      { row: 'fh', rich: `Je Fachhandel Aktivierung Mobilfunk Neu/Mobilfunk VVL/DSL Neu/DSL VVL`, quote: null, ist: fh, rel: fh, betrag: R.fhBetrag, dform: c => c },
+      { row: 'abw', rich: `Urlaub/Krankheit/Schulung`, small: true, quote: null, ist: urlaub + krank, rel: urlaub + krank, betrag: R.abwBetrag, dform: c => c }
+    ].map(r => ({ ...r, label: strip(r.rich), aus: r.rel > 0 ? r2(r.rel * r.betrag) : 0 }));
+    const pushText = String(inp.pushText || '').trim();
+    rows.push({ row: 'push', rich: '**Push-Provision**' + (pushText ? ': ' + pushText : ''), label: 'Push-Provision' + (pushText ? ': ' + pushText : ''), quote: null, ist: null, rel: null, betrag: null, aus: r2(n(inp.pushBetrag)) });
+    const summe = r2(rows.reduce((s, r) => s + r.aus, 0));
+    const tz = !!inp.teilzeit;
+    const tvSollAnteilig = (tz ? R.tvSollTZ : R.tvSoll) * q.anteil;
+    const osSollAnteilig = (tz ? R.osSollTZ : R.osSoll) * q.anteil;
+    const has = v => !(v === '' || v == null || (typeof v === 'number' && !isFinite(v)));
+    const qual = [
+      { row: 'werb', label: 'Werbeversprechen', soll: R.werbSoll, ist: pct(inp.werb), rated: has(inp.werb), fmt: 'pct' },
+      { row: 'pencil', label: 'Pencil-Selling', soll: R.pencilSoll, ist: pct(inp.pencil), rated: has(inp.pencil), fmt: 'pct' },
+      { row: 'marketing', label: 'Marketing Aktivitäten', soll: R.marketingSoll, ist: n(inp.marketing), rated: has(inp.marketing), fmt: 'num' },
+      { row: 'tv', label: `o2 TV unter ${nf(tvSollAnteilig)} Stück im Monat${tz ? ' (Azubi/Teilzeit)' : ''}`, soll: tvSollAnteilig, ist: tv, rated: true, fmt: 'num' },
+      { row: 'os', label: `Online-Schutz unter ${nf(osSollAnteilig)} Stück im Monat${tz ? ' (Azubi/Teilzeit)' : ''}`, soll: osSollAnteilig, ist: schutzOnline, rated: true, fmt: 'num' }
+    ].map(x => { const f = x.ist < x.soll ? -R.abzug : 0; return { ...x, faktor: f, betrag: r2(summe * f) }; });
+    const msyIst = pct(inp.msy);
+    const msy = { row: 'msy', label: `MSY Mitarbeiter größer ${p(R.msySoll)} gibt ${e0(R.msyBonus)}`, soll: R.msySoll, ist: msyIst, betrag: msyIst > R.msySoll ? R.msyBonus : 0 };
+    const korr = GS.map(([k, qrow], i) => {
+      const qx = qual.find(x => x.row === qrow); const ded = -qx.betrag; const mode = inp['gs_' + k];
+      let b = 0;
+      if (ded > 0 && mode === 'voll') b = ded;
+      if (ded > 0 && mode === 'teil') b = Math.min(Math.max(n(inp['gsb_' + k]), 0), ded);
+      b = r2(b);
+      return { row: 'k_' + k, key: k, label: KORR_LABELS[i], betrag: b, abzug: ded,
+        note: b ? (mode === 'voll' ? 'Kulanz: volle Gutschrift' : `Kulanz: Teilgutschrift ${eur(b)} von ${eur(ded)}`) : '' };
+    });
+    const ksT = String(inp.korrSonstText || '').trim();
+    korr.push({ row: 'k_sonst', key: 'sonst', label: KORR_LABELS[5] + (ksT ? ': ' + ksT : ''), betrag: r2(n(inp.korrSonst)), note: '' });
+    let sl = null;
+    if (inp.shopleiter) {
+      const ziel = n(inp.slZiel), ist = n(inp.slIst), r1 = pct(inp.slRate1), r2_ = pct(inp.slRate2), unten = ziel * 0.75;
+      const band = (ist < ziel ? ist : ziel) - unten, ueber = ist > ziel ? ist - ziel : 0;
+      const betrag = ziel > 0 ? r2(Math.max(0, band * r1 + ueber * r2_)) : 0;
+      sl = { ziel, ist, quote: ziel > 0 ? ist / ziel : 0, band, ueber, r1, r2: r2_, betrag, fehlt: inp.slIst === '' || inp.slIst == null || !ziel };
+    }
+    const brutto = r2(summe + qual.reduce((s, x) => s + x.betrag, 0) + msy.betrag + korr.reduce((s, k) => s + k.betrag, 0) + (sl ? sl.betrag : 0));
+    const sonder = { betrag: r2(n(inp.sonderBetrag)), text: String(inp.sonderText || '').trim() };
+    const total = r2(Math.max(brutto, R.fix) + sonder.betrag);
+    return { q, rows, summe, qual, msy, korr, sonder, sl, brutto, total, fixGreift: brutto < R.fix, tz };
+  }
+
+  // ---------- Excel-Export (gleiches Layout wie PDF, mit Formeln) ----------
+  async function buildXlsx(ExcelJS, _unused, inp, R) {
+    const res = calc(inp, R);
+    const wb = new ExcelJS.Workbook();
+    wb.calcProperties = { fullCalcOnLoad: true };
+    const ws = wb.addWorksheet('Provisionsabrechnung', {
+      pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } },
+      views: [{ showGridLines: false }]
+    });
+    ws.columns = [{ width: 74 }, { width: 8 }, { width: 11 }, { width: 11 }, { width: 14 }, { width: 15 }];
+    const FILL = { y: 'FFFFFF00', g: 'FFD9D9D9', d: 'FF404040', o: 'FFF49C52', gr: 'FF92D050', l: 'FFF2F2F2', h: 'FFF2F2F2', w: 'FFFFFFFF' };
+    const EUR = '#,##0.00 "€"';
+    const ACC = '_-* #,##0.00 "€"_-;-* #,##0.00 "€"_-;_-* "-"?? "€"_-;_-@_-';
+    const thin = { style: 'thin', color: { argb: 'FF000000' } };
+    const cell = (a, v, o = {}) => {
+      const c = ws.getCell(a);
+      if (v !== undefined) c.value = v;
+      c.font = { name: 'Calibri', size: o.size || 11, bold: !!o.bold, underline: o.underline, color: { argb: o.color || 'FF000000' } };
+      if (o.fill) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: FILL[o.fill] || o.fill } };
+      if (o.border !== false && o.fill !== undefined) c.border = { top: thin, left: thin, bottom: thin, right: thin };
+      if (o.fmt) c.numFmt = o.fmt;
+      c.alignment = { vertical: o.v || 'middle', horizontal: o.h, wrapText: !!o.wrap, indent: o.indent };
+      return c;
+    };
+    const fx = (formula, result) => ({ formula, result });
+    const monat = String(inp.monat || '');
+
+    cell('A1', 'Provisionsabrechnung monatlich', { bold: true, size: 18 });
+    cell('A2', 'Vorname/Name:', { size: 9 }); cell('F2', 'Monat:', { size: 9 });
+    ['A', 'B', 'C', 'D', 'E', 'F'].forEach(c => cell(c + '3', undefined, { fill: 'y', border: false }));
+    cell('A3', inp.name || '', { bold: true, size: 14, fill: 'y', border: false });
+    cell('F3', monat, { bold: true, size: 14, fill: 'y', border: false });
+    cell('A5', 'Abrechnung Provisionen:', { bold: true, size: 14 });
+    ws.mergeCells('B5:E5'); cell('B5', 'erreichte Provision', { bold: true, fill: 'y', h: 'center', border: false });
+    ['Zielpunkt/Aktionen', 'Quote', 'Erreichte Stücke', 'Provi-relevante Stücke', 'Einzelbetrag', 'Auszahlung'].forEach((t, i) =>
+      cell(String.fromCharCode(65 + i) + '6', t, { bold: true, size: i ? 9 : 9, fill: 'h', h: i ? 'center' : 'left', v: i ? 'middle' : 'top', wrap: true }));
+    ws.getRow(6).height = 42;
+
+    let r = 7; const provRows = [];
+    res.rows.forEach(x => {
+      ws.getRow(r).height = 20;
+      cell('A' + r, strip(x.rich), { fill: 'g', size: x.small ? 9 : 11 });
+      if (x.row === 'push') {
+        cell('B' + r, null, { fill: 'd' }); cell('C' + r, null, { fill: 'y' }); cell('D' + r, null, { fill: 'y' }); cell('E' + r, null, { fill: 'y' });
+        cell('F' + r, x.aus || 0, { fill: 'w', bold: true, fmt: ACC, h: 'right' });
+      } else {
+        if (x.quote == null) cell('B' + r, null, { fill: 'd' }); else cell('B' + r, x.quote, { fill: 'y', fmt: '0%', size: 9 });
+        cell('C' + r, x.ist, { fill: 'y', fmt: x.euro ? EUR : '0', size: 10, h: 'left' });
+        cell('D' + r, fx(x.dform('C' + r, 'B' + r), x.rel), { fill: 'y', fmt: '0.##', size: 10, h: 'right' });
+        cell('E' + r, x.betrag, { fill: 'y', fmt: EUR, h: 'right', v: 'top' });
+        cell('F' + r, fx(`IF(D${r}>0,D${r}*E${r},0)`, x.aus), { fill: 'w', bold: true, fmt: ACC, h: 'right' });
+      }
+      provRows.push(r); r++;
+    });
+    const rSum = r;
+    cell('A' + r, 'Summe Provision', { bold: true, size: 14, fill: 'y' });
+    cell('B' + r, null, { fill: 'o' }); ['C', 'D', 'E'].forEach(c => cell(c + r, null, { fill: 'y' }));
+    cell('F' + r, fx(`SUM(F${provRows[0]}:F${provRows[provRows.length - 1]})`, res.summe), { fill: 'w', bold: true, size: 13, fmt: ACC, h: 'right' });
+    ws.getRow(r).height = 22; r++;
+    const addCells = [];
+    if (res.sl) {
+      const sl = res.sl;
+      ws.mergeCells(`A${r}:E${r}`);
+      cell('A' + r, `Shopleiter-Provision Marge: Ziel ${eur(sl.ziel)} · Ist ${eur(sl.ist)} · ${pf(sl.quote)} · 75–100 %: ${pf(sl.r1)} · über 100 %: ${pf(sl.r2)}`, { fill: 'y', bold: true });
+      cell('F' + r, sl.betrag, { fill: 'w', bold: true, fmt: ACC, h: 'right' }); addCells.push('F' + r); ws.getRow(r).height = 20; r++;
+    }
+    ws.mergeCells(`A${r}:B${r}`);
+    cell('A' + r, 'Quoten und Boni', { bold: true, size: 14, fill: 'w' });
+    cell('C' + r, 'Soll', { bold: true, fill: 'w', h: 'center' }); cell('D' + r, 'Ist', { bold: true, fill: 'w', h: 'center' });
+    cell('E' + r, null, { fill: 'd' }); cell('F' + r, null, { fill: 'd' }); ws.getRow(r).height = 22; r++;
+    res.qual.forEach(x => {
+      ws.mergeCells(`A${r}:B${r}`);
+      cell('A' + r, x.label, { fill: 'y' });
+      const fmt = x.fmt === 'pct' ? '0%' : '0.##';
+      cell('C' + r, x.soll, { fill: 'y', fmt, h: 'center', size: 10 });
+      cell('D' + r, x.rated ? x.ist : null, { fill: 'y', fmt, h: 'center', size: 10 });
+      cell('E' + r, fx(`IF(N(D${r})<C${r},-${R.abzug},0)`, x.faktor), { fill: 'y', fmt: '0%', h: 'right', v: 'top' });
+      cell('F' + r, fx(`$F$${rSum}*E${r}`, x.betrag), { fill: 'w', bold: true, fmt: ACC, h: 'right' });
+      addCells.push('F' + r); ws.getRow(r).height = 20; r++;
+    });
+    ws.mergeCells(`A${r}:B${r}`);
+    cell('A' + r, res.msy.label, { fill: 'y' });
+    cell('C' + r, res.msy.soll, { fill: 'y', fmt: '0%', h: 'center', size: 10 });
+    cell('D' + r, res.msy.ist, { fill: 'y', fmt: '0%', h: 'center', size: 10 });
+    cell('E' + r, R.msyBonus, { fill: 'y', fmt: EUR, h: 'right', v: 'top' });
+    cell('F' + r, fx(`IF(D${r}>C${r},E${r},0)`, res.msy.betrag), { fill: 'w', bold: true, fmt: ACC, h: 'right' });
+    addCells.push('F' + r); ws.getRow(r).height = 20; r++;
+    res.korr.forEach(k => {
+      ws.mergeCells(`A${r}:B${r}`);
+      cell('A' + r, k.label + (k.note ? ' – ' + k.note : ''), { fill: 'y', bold: !!k.note });
+      ['C', 'D', 'E'].forEach(c => cell(c + r, null, { fill: 'y' }));
+      cell('F' + r, k.betrag || null, { fill: 'w', bold: true, fmt: ACC, h: 'right' });
+      addCells.push('F' + r); ws.getRow(r).height = 20; r++;
+    });
+    let sonderCell = null;
+    if (res.sonder.betrag) {
+      ws.mergeCells(`A${r}:B${r}`);
+      cell('A' + r, 'Sonderprovision' + (res.sonder.text ? ': ' + res.sonder.text : ''), { fill: 'y', bold: true });
+      ['C', 'D', 'E'].forEach(c => cell(c + r, null, { fill: 'y' }));
+      cell('F' + r, res.sonder.betrag, { fill: 'w', bold: true, fmt: ACC, h: 'right' });
+      sonderCell = 'F' + r; ws.getRow(r).height = 20; r++;
+    }
+    r++;
+    const rTot = r;
+    ['A', 'B', 'C', 'D', 'E', 'F'].forEach(c => { cell(c + r, undefined, { fill: 'gr', border: false }); cell(c + (r + 1), undefined, { fill: 'gr', border: false }); cell(c + (r + 2), undefined, { fill: 'gr', border: false }); });
+    cell('A' + r, 'Auszahlungsbetrag', { fill: 'gr', bold: true, size: 16, underline: true, border: false });
+    cell('E' + r, monat, { fill: 'gr', bold: true, size: 13, underline: true, h: 'right', border: false });
+    const sumExpr = `F${rSum}+${addCells.join('+')}`;
+    cell('F' + r, fx(sonderCell ? `MAX(${sumExpr},${R.fix})+${sonderCell}` : `MAX(${sumExpr},${R.fix})`, res.total),
+      { fill: 'gr', bold: true, size: 16, underline: 'doubleAccounting', fmt: '#,##0.00 "€"', h: 'right', border: false });
+    ws.getRow(r).height = 26; ws.getRow(r + 1).height = 30;
+    cell('A' + (r + 2), 'Datum & Unterschrift Mitarbeiter', { fill: 'gr', size: 9, border: false });
+    cell('D' + (r + 2), 'Datum & Unterschrift Vorgesetzter', { fill: 'gr', size: 9, border: false });
+    ['A', 'B', 'C', 'D', 'E', 'F'].forEach(c => { const x = ws.getCell(c + (r + 2)); x.border = { top: thin }; });
+    for (let i = r; i <= r + 2; i++) { ws.getCell('A' + i).border = { ...(ws.getCell('A' + i).border || {}), left: thin }; ws.getCell('F' + i).border = { ...(ws.getCell('F' + i).border || {}), right: thin }; }
+    ['A', 'B', 'C', 'D', 'E', 'F'].forEach(c => { ws.getCell(c + r).border = { ...(ws.getCell(c + r).border || {}), top: thin }; ws.getCell(c + (r + 2)).border = { ...(ws.getCell(c + (r + 2)).border || {}), bottom: thin }; });
+    if (res.fixGreift) cell('F' + (r + 1), `Fixprovision greift (berechnet ${eur(res.brutto)})`, { fill: 'gr', size: 8, h: 'right', border: false });
+    r += 4;
+    cell('A' + r, 'Regularien:', { bold: true, size: 9, underline: true, color: 'FF1F4E79' }); r++;
+    regularien(R).forEach((t, i, arr) => {
+      ws.mergeCells(`A${r}:F${r}`);
+      cell('A' + r, t, { size: 8, color: 'FF1F4E79', wrap: true, bold: i === arr.length - 1, fill: 'l', border: false });
+      ws.getRow(r).height = t.length > 160 ? 24 : 13; r++;
+    });
+    ws.pageSetup.printArea = `A1:F${r}`;
+    return { buffer: await wb.xlsx.writeBuffer(), res };
+  }
+
+  const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
+  function monatsInfo(inp) {
+    const m = MONATE.findIndex(x => x.toLowerCase() === String(inp.monat || '').trim().toLowerCase());
+    const j = parseInt(inp.jahr, 10) || new Date().getFullYear();
+    const pad = v => String(v).padStart(2, '0');
+    if (m < 0) return { von: '', bis: '', vereinbarung: String(inp.monat || ''), naechster: '', jahr: j };
+    const last = new Date(j, m + 1, 0).getDate();
+    return {
+      von: `01.${pad(m + 1)}.${j}`, bis: `${last}.${pad(m + 1)}.${j}`,
+      vereinbarung: `${MONATE[m]} ${j}`,
+      naechster: m === 11 ? `Januar ${j + 1}` : MONATE[m + 1],
+      jahr: j
+    };
+  }
+
+  function buildPdf(jsPDF, inp, R) {
+    const res = calc(inp, R);
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const YEL = [255, 255, 0], GRY = [217, 217, 217], DRK = [64, 64, 64], ORA = [244, 156, 82], GRN = [146, 208, 80], LGR = [242, 242, 242], WHT = [255, 255, 255];
+    const X = [9.3, 107.3, 113.8, 125.2, 138.9, 161.5, 184.8];
+    const RH = 5.1;
+    const F = 'helvetica';
+
+    const box = (x1, y1, x2, y2, fill, lw = 0.15) => {
+      doc.setLineWidth(lw); doc.setDrawColor(0);
+      if (fill) { doc.setFillColor(...fill); doc.rect(x1, y1, x2 - x1, y2 - y1, 'FD'); }
+      else doc.rect(x1, y1, x2 - x1, y2 - y1, 'S');
+    };
+    const txt = (s, x, y, o = {}) => {
+      doc.setFont(F, o.bold ? 'bold' : 'normal'); doc.setFontSize(o.size || 7.5); doc.setTextColor(...(o.color || [0, 0, 0]));
+      doc.text(String(s), x, y, { align: o.align || 'left' });
+    };
+    // Text mit **fett**-Abschnitten, schrumpft bei Überlänge
+    const rich = (s, x, y, maxW, size = 7.5) => {
+      const parts = s.split('**');
+      const width = sz => parts.reduce((w, t, i) => { doc.setFont(F, i % 2 ? 'bold' : 'normal'); doc.setFontSize(sz); return w + doc.getTextWidth(t); }, 0);
+      let sz = size; while (width(sz) > maxW && sz > 5) sz -= 0.25;
+      let cx = x;
+      parts.forEach((t, i) => { if (!t) return; doc.setFont(F, i % 2 ? 'bold' : 'normal'); doc.setFontSize(sz); doc.setTextColor(0); doc.text(t, cx, y); cx += doc.getTextWidth(t); });
+    };
+    const de = (v, d = 2) => v.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const eur2 = v => de(v) + ' €';
+    const pc = v => Math.round(v * 100) + '%';
+    const st = v => (Math.round(v * 100) / 100).toLocaleString('de-DE');
+    // Buchhaltungsformat wie in Excel: "-  €" bei 0, Minus links in der Zelle
+    const acc = (v, x1, x2, y, o = {}) => {
+      const r = Math.round(v * 100) / 100;
+      const s = r === 0 ? '-     €' : (Number.isInteger(r) ? de(Math.abs(r), 0) : de(Math.abs(r))) + ' €';
+      txt(s, x2 - 1.2, y, { bold: true, align: 'right', size: o.size || 7.5 });
+      if (r < 0) txt('-', x1 + 0.8, y, { bold: true, size: o.size || 7.5 });
+    };
+
+    // Kopf
+    txt('Provisionsabrechnung monatlich', X[0] + 0.3, 25.6, { bold: true, size: 14 });
+    txt('Vorname/Name:', X[0] + 0.3, 30.4, { size: 6 });
+    txt('Monat:', X[5] + 0.6, 30.4, { size: 6 });
+    doc.setFillColor(...YEL); doc.rect(X[0], 31.5, X[6] - X[0], 3.8, 'F');
+    txt(inp.name || '', X[0] + 0.3, 34.6, { bold: true, size: 9.5 });
+    txt(inp.monat || '', X[5] + 0.6, 34.6, { bold: true, size: 9.5 });
+
+    txt('Abrechnung Provisionen:', X[0] + 0.3, 41.6, { bold: true, size: 11 });
+    doc.setFillColor(...YEL); doc.rect(X[1], 38.3, X[6] - X[1], 3.9, 'F');
+    txt('erreichte Provision', (X[1] + X[6]) / 2, 41.3, { bold: true, size: 8.5, align: 'center' });
+
+    // Tabellenkopf
+    let y = 42.2; const hh = 11.1;
+    box(X[0], y, X[1], y + hh, LGR);
+    txt('Zielpunkt/Aktionen', X[0] + 0.6, y + 2.4, { bold: true, size: 6 });
+    const hd = [['Quote'], ['Erreichte', 'Stücke'], ['Provi-', 'relevante', 'Stücke'], ['Einzelbetrag'], ['Auszahlung']];
+    hd.forEach((ls, i) => {
+      box(X[i + 1], y, X[i + 2], y + hh, LGR);
+      const cy = y + hh / 2 - (ls.length - 1) * 1.25 + 0.8;
+      ls.forEach((l, k) => txt(l, (X[i + 1] + X[i + 2]) / 2, cy + k * 2.5, { bold: true, size: i === 0 ? 5 : 6, align: 'center' }));
+    });
+    y += hh;
+
+    // Provisionszeilen
+    res.rows.forEach(r => {
+      const b = y + RH - 1.4;
+      if (r.row === 'push') {
+        box(X[0], y, X[1], y + RH, GRY);
+        rich(r.rich, X[0] + 0.6, b, X[1] - X[0] - 1.4);
+        box(X[1], y, X[2], y + RH, DRK); box(X[2], y, X[3], y + RH, YEL); box(X[3], y, X[4], y + RH, YEL); box(X[4], y, X[5], y + RH, YEL);
+        box(X[5], y, X[6], y + RH, WHT); acc(r.aus, X[5], X[6], b);
+        y += RH; return;
+      }
+      box(X[0], y, X[1], y + RH, GRY);
+      rich(r.rich, X[0] + 0.6, b, X[1] - X[0] - 1.4, r.small ? 6.5 : 7.5);
+      if (r.quote == null) { box(X[1], y, X[2], y + RH, DRK); if (r.row !== 'abw' && r.row !== 'fh') txt('-', X[1] + 0.4, b, { size: 5 }); }
+      else { box(X[1], y, X[2], y + RH, YEL); txt(pc(r.quote), X[1] + 0.4, b, { size: 6.5 }); }
+      box(X[2], y, X[3], y + RH, YEL); txt(r.euro ? eur2(r.ist) : st(r.ist), X[2] + 0.4, b, { size: 6.5 });
+      box(X[3], y, X[4], y + RH, YEL); txt(st(r.rel), X[4] - 0.6, b, { size: 6.5, align: 'right' });
+      box(X[4], y, X[5], y + RH, YEL); txt(eur2(r.betrag), X[5] - 0.8, b - 0.7, { align: 'right' });
+      box(X[5], y, X[6], y + RH, WHT); acc(r.aus, X[5], X[6], b);
+      y += RH;
+    });
+    // Summe
+    box(X[0], y, X[1], y + RH, YEL); txt('Summe Provision', X[0] + 0.3, y + RH - 1.3, { bold: true, size: 9 });
+    box(X[1], y, X[2], y + RH, ORA); box(X[2], y, X[5], y + RH, YEL); box(X[5], y, X[6], y + RH, WHT);
+    acc(res.summe, X[5], X[6], y + RH - 1.3, { size: 8.5 });
+    doc.setLineWidth(0.5); doc.line(X[0], y, X[6], y); doc.line(X[0], y + RH, X[6], y + RH);
+    y += RH;
+
+    if (res.sl) {
+      const b = y + RH - 1.4, sl = res.sl;
+      box(X[0], y, X[5], y + RH, YEL);
+      rich(`**Shopleiter-Provision** Marge: Ziel ${eur2(sl.ziel)} · Ist ${eur2(sl.ist)} · **${(Math.round(sl.quote * 1000) / 10).toLocaleString('de-DE')} %** · 75–100 %: ${(sl.r1 * 100).toLocaleString('de-DE')} % · über 100 %: ${(sl.r2 * 100).toLocaleString('de-DE')} %`, X[0] + 0.3, b, X[5] - X[0] - 1.5);
+      box(X[5], y, X[6], y + RH, WHT); acc(sl.betrag, X[5], X[6], b);
+      y += RH;
+    }
+    // Quoten und Boni
+    box(X[0], y, X[2], y + RH, WHT); txt('Quoten und Boni', X[0] + 0.3, y + RH - 1.3, { bold: true, size: 9 });
+    box(X[2], y, X[3], y + RH, WHT); txt('Soll', (X[2] + X[3]) / 2, y + RH - 1.3, { bold: true, size: 8, align: 'center' });
+    box(X[3], y, X[4], y + RH, WHT); txt('Ist', (X[3] + X[4]) / 2, y + RH - 1.3, { bold: true, size: 8, align: 'center' });
+    box(X[4], y, X[5], y + RH, DRK); box(X[5], y, X[6], y + RH, DRK);
+    y += RH;
+    const qv = (x, v) => x.fmt === 'pct' ? pc(v) : st(v);
+    res.qual.forEach(x => {
+      const b = y + RH - 1.4;
+      box(X[0], y, X[2], y + RH, YEL); rich(x.label, X[0] + 0.3, b, X[2] - X[0] - 1);
+      box(X[2], y, X[3], y + RH, YEL); txt(qv(x, x.soll), (X[2] + X[3]) / 2, b, { size: 6.5, align: 'center' });
+      box(X[3], y, X[4], y + RH, YEL); txt(x.rated ? qv(x, x.ist) : 'fehlt', (X[3] + X[4]) / 2, b, { size: 6.5, align: 'center' });
+      box(X[4], y, X[5], y + RH, YEL); txt(pc(x.faktor), X[5] - 0.8, b - 0.7, { align: 'right' });
+      box(X[5], y, X[6], y + RH, WHT); acc(x.betrag, X[5], X[6], b);
+      y += RH;
+    });
+    {
+      const m = res.msy, b = y + RH - 1.4;
+      box(X[0], y, X[2], y + RH, YEL); txt(res.msy.label, X[0] + 0.3, b);
+      box(X[2], y, X[3], y + RH, YEL); txt(pc(m.soll), (X[2] + X[3]) / 2, b, { size: 6.5, align: 'center' });
+      box(X[3], y, X[4], y + RH, YEL); txt(pc(m.ist), (X[3] + X[4]) / 2, b, { size: 6.5, align: 'center' });
+      box(X[4], y, X[5], y + RH, YEL); txt(eur2(R.msyBonus), X[5] - 0.8, b - 0.7, { align: 'right' });
+      box(X[5], y, X[6], y + RH, WHT); acc(m.betrag, X[5], X[6], b);
+      y += RH;
+    }
+    res.korr.forEach(k => {
+      const b = y + RH - 1.4;
+      box(X[0], y, X[2], y + RH, YEL); rich(k.label + (k.note ? '  **' + k.note + '**' : ''), X[0] + 0.3, b, X[2] - X[0] - 1);
+      box(X[2], y, X[3], y + RH, YEL); box(X[3], y, X[4], y + RH, YEL); box(X[4], y, X[5], y + RH, YEL);
+      box(X[5], y, X[6], y + RH, WHT); if (k.betrag) acc(k.betrag, X[5], X[6], b);
+      y += RH;
+    });
+
+    if (res.sonder.betrag) {
+      const b = y + RH - 1.4;
+      box(X[0], y, X[2], y + RH, YEL); rich('**Sonderprovision**' + (res.sonder.text ? ': ' + res.sonder.text : ''), X[0] + 0.3, b, X[2] - X[0] - 1);
+      box(X[2], y, X[3], y + RH, YEL); box(X[3], y, X[4], y + RH, YEL); box(X[4], y, X[5], y + RH, YEL);
+      box(X[5], y, X[6], y + RH, WHT); acc(res.sonder.betrag, X[5], X[6], b);
+      y += RH;
+    }
+    // Auszahlungsbetrag (grüner Block)
+    y += 5;
+    const gy = y, gh = 17.5;
+    box(X[0], gy, X[6], gy + gh, GRN, 0.3);
+    doc.setLineWidth(0.15); doc.line(X[0], gy + gh - 3, X[6], gy + gh - 3);
+    txt('Auszahlungsbetrag', X[0] + 0.6, gy + 4.4, { bold: true, size: 11 });
+    doc.setLineWidth(0.25); doc.line(X[0] + 0.6, gy + 5.1, X[0] + 0.6 + doc.getTextWidth('Auszahlungsbetrag'), gy + 5.1);
+    txt(inp.monat || '', 145.6, gy + 4.7, { bold: true, size: 10 });
+    doc.line(145.6, gy + 5.4, 145.6 + doc.getTextWidth(inp.monat || ''), gy + 5.4);
+    const tot = Math.round(res.total * 100) / 100;
+    const totS = (Number.isInteger(tot) ? de(tot, 0) : de(tot)) + ' €';
+    txt(totS, X[6] - 1.6, gy + 4.4, { bold: true, size: 11, align: 'right' });
+    const ux = Math.min(166, X[6] - 2.5 - doc.getTextWidth(totS));
+    doc.line(ux, gy + 5.4, X[6] - 1.5, gy + 5.4); doc.line(ux, gy + 6, X[6] - 1.5, gy + 6);
+    if (res.fixGreift) txt(`Fixprovision greift (berechnet ${eur2(res.brutto)})`, X[6] - 1.6, gy + 8.5, { size: 5.5, align: 'right' });
+    txt('Datum & Unterschrift Mitarbeiter', X[0] + 0.6, gy + gh - 0.8, { size: 6.5 });
+    txt('Datum & Unterschrift Vorgesetzter', 118.5, gy + gh - 0.8, { size: 6.5 });
+
+    // Regularien
+    y = gy + gh + 4.5;
+    const BLU = [31, 78, 121];
+    const regs = regularien(R);
+    doc.setFont(F, 'normal'); doc.setFontSize(5.3);
+    const lines = regs.map((t, i) => doc.splitTextToSize(t, X[6] - X[0] - 2));
+    const hReg = 5 + lines.reduce((s, l) => s + l.length * 2.9, 0) + 1;
+    box(X[0], y, X[6], y + hReg, LGR, 0.15);
+    let ry = y + 2.8;
+    txt('Regularien:', X[0] + 0.6, ry, { bold: true, size: 6, color: BLU });
+    doc.setDrawColor(...BLU); doc.setLineWidth(0.15); doc.line(X[0] + 0.6, ry + 0.4, X[0] + 0.6 + doc.getTextWidth('Regularien:'), ry + 0.4); doc.setDrawColor(0);
+    ry += 3.2;
+    lines.forEach((ls, i) => {
+      const last = i === lines.length - 1;
+      doc.setFont(F, last ? 'bold' : 'normal'); doc.setFontSize(5.3); doc.setTextColor(...BLU);
+      ls.forEach(l => {
+        doc.text(l, X[0] + 0.6, ry);
+        if (last) { doc.setDrawColor(...BLU); doc.line(X[0] + 0.6, ry + 0.4, X[0] + 0.6 + doc.getTextWidth(l), ry + 0.4); doc.setDrawColor(0); }
+        ry += 2.9;
+      });
+    });
+
+    // Seite 2: Zusatzvereinbarung
+    addZusatz(doc, inp, res);
+    if (res.sonder.betrag) addSonder(doc, inp, res);
+    return doc;
+  }
+
+  function addZusatz(doc, inp, res) {
+    const F = 'helvetica', L = 25, Rr = 185;
+    const mi = monatsInfo(inp);
+    doc.addPage();
+    doc.setTextColor(0); doc.setDrawColor(0);
+    const t = (s, x, y, o = {}) => { doc.setFont(F, o.bold ? 'bold' : 'normal'); doc.setFontSize(o.size || 10.5); doc.text(String(s), x, y, { align: o.align || 'left', maxWidth: o.maxWidth }); };
+    // Ausfüllfeld: Linie + Wert darüber
+    const fld = (x, y, w, val, size = 8.5) => {
+      doc.setLineWidth(0.2); doc.line(x, y + 0.6, x + w, y + 0.6);
+      if (val) { doc.setFont(F, 'normal'); doc.setFontSize(size); doc.text(String(val), x + w / 2, y - 0.4, { align: 'center' }); }
+    };
+    const mw = s => { doc.setFont(F, 'normal'); doc.setFontSize(10.5); return doc.getTextWidth(s); };
+
+    let y = 62;
+    t('Zusatzvereinbarung', 105, y, { bold: true, align: 'center' });
+    y += 5;
+    const zt = 'zur Provisionsvereinbarung vom ';
+    doc.setFont(F, 'bold'); doc.setFontSize(10.5); const zw = doc.getTextWidth(zt) + 24; const zx = 105 - zw / 2;
+    t(zt, zx, y, { bold: true });
+    doc.setLineWidth(0.4); doc.line(zx + zw - 24, y + 0.6, zx + zw, y + 0.6);
+    doc.setFont(F, 'normal'); doc.setFontSize(8.5); doc.text(inp.monat || '', zx + zw - 12, y - 1.8, { align: 'center' });
+
+    y += 18; t('zwischen der', L, y);
+    y += 9; t('HeTec Shop GmbH, Ludwigstraße 30, 84524 Neuötting', L, y, { bold: true });
+    y += 5;
+    { const w1 = mw('nachstehend „'); doc.setFont(F, 'bold'); doc.setFontSize(10.5); const w2 = doc.getTextWidth('die Gesellschaft');
+      t('nachstehend „', 120, y); t('die Gesellschaft', 120 + w1, y, { bold: true }); t('“ genannt –', 120 + w1 + w2, y); }
+    y += 5; t('und', L, y);
+    y += 15;
+    doc.setLineWidth(0.2); doc.line(L, y + 0.6, L + 78, y + 0.6);
+    doc.setFont(F, 'normal'); doc.setFontSize(8.5); doc.text(inp.vollerName || inp.name || '', L + 4, y - 0.6);
+    y += 4.5; t('Vorname, Name Mitarbeiter/in', L, y, { bold: true });
+    y += 8; t('– nachstehend auch „Arbeitnehmer“ genannt –', Rr, y, { align: 'right' });
+    y += 4.5; t('– gemeinsam nachstehend „Parteien“ genannt –', Rr, y, { align: 'right' });
+
+    y += 14;
+    const a1 = 'wird in Bezug auf die Provisionsvereinbarung vom ';
+    t(a1, L, y); fld(L + mw(a1), y, 30, mi.vereinbarung); t(' Folgendes vereinbart:', L + mw(a1) + 30, y);
+
+    y += 9;
+    t('1.', L, y); t('Die Parteien sind sich einig, dass die dem Arbeitnehmer zustehende Provision für den', L + 12, y);
+    y += 5;
+    let x = L; t('Zeitraum vom ', x, y); x += mw('Zeitraum vom ');
+    fld(x, y, 22, mi.von); x += 23; t(' bis zum ', x, y); x += mw(' bis zum ');
+    fld(x, y, 22, mi.bis); x += 26; t('EUR ', x, y); x += mw('EUR ');
+    fld(x, y, 20, res.total.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })); x += 21; t(' brutto beträgt.', x, y);
+    y += 5;
+    doc.setFont(F, 'normal'); doc.setFontSize(10.5);
+    const p1 = 'Darüberhinausgehende Ansprüche des Arbeitnehmers auf variable Vergütung (z.B. Provision, Boni, etc.), gleich aus welchem Rechtsgrund, bestehen nicht, und zwar auch nicht aus der Vergangenheit.';
+    const p1l = doc.splitTextToSize(p1, Rr - L - 12);
+    doc.text(p1l[0], L + 12, y);
+    const rest = doc.splitTextToSize(p1.slice(p1l[0].length).trim(), Rr - L);
+    doc.text(rest, L, y + 4.6, { align: 'justify', maxWidth: Rr - L });
+    y += 4.6 * (rest.length + 1);
+    t('Die Parteien beabsichtigen jedoch, für den Zeitraum ab', L + 12, y);
+    y += 5; t('dem ', L + 12, y); fld(L + 12 + mw('dem '), y, 22, mi.naechster); t(' eine neue Provisionsvereinbarung zu schließen.', L + 12 + mw('dem ') + 22, y);
+
+    y += 9; t('2.', L, y); t('Mündliche Nebenabreden zum Gegenstand dieser Zusatzvereinbarung sind nicht getroffen.', L + 12, y);
+    y += 9; t('3.', L, y);
+    const p3 = 'Die zwischen den Parteien bestehenden arbeitsvertraglichen Vereinbarungen bleiben von dieser Zusatzvereinbarung unberührt, soweit sie den in dieser Zusatzvereinbarung getroffenen Regelungen nicht zuwiderlaufen. In letzterem Falle haben die Regelungen dieser Zusatzvereinbarung Vorrang vor den abweichenden arbeitsvertraglichen Regelungen.';
+    doc.setFont(F, 'normal'); doc.setFontSize(10.5);
+    const f3 = doc.splitTextToSize(p3, Rr - L - 12);
+    doc.text(f3[0], L + 12, y);
+    const r3 = doc.splitTextToSize(p3.slice(f3[0].length).trim(), Rr - L);
+    doc.text(r3, L, y + 4.6, { align: 'justify', maxWidth: Rr - L });
+    y += 4.6 * (r3.length + 1) + 12;
+
+    fld(L, y, 38, inp.ort); t(', den ', L + 38, y); fld(L + 38 + mw(', den '), y, 36, inp.datum);
+    y += 26;
+    doc.setLineWidth(0.2); doc.line(L, y, L + 75, y); doc.line(110, y, Rr, y);
+    t('HeTec Shop GmbH', L, y + 3.6, { size: 7.5 }); t('Arbeitnehmer', 110, y + 3.6, { size: 7.5 });
+    y += 16;
+    doc.setFont(F, 'normal'); doc.setFontSize(7.5);
+    doc.text('Die Bezeichnung „Arbeitnehmer“ steht für Arbeitnehmer jeden Geschlechts und wird in diesem Vertrag aus Gründen der Lesbarkeit einheitlich in der maskulinen Sprachversion verwendet.', 105, y, { align: 'center', maxWidth: 175 });
+  }
+
+
+  function addSonder(doc, inp, res) {
+    const F = 'helvetica', L = 25, Rr = 185, W = Rr - L;
+    const mi = monatsInfo(inp);
+    const e = v => v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    doc.addPage(); doc.setTextColor(0); doc.setDrawColor(0);
+    const t = (s, x, y, o = {}) => { doc.setFont(F, o.bold ? 'bold' : 'normal'); doc.setFontSize(o.size || 10.5); doc.text(s, x, y, { align: o.align || 'left', maxWidth: o.maxWidth }); };
+    const para = (s, y, o = {}) => { doc.setFont(F, o.bold ? 'bold' : 'normal'); doc.setFontSize(10.5); const ls = doc.splitTextToSize(s, W - (o.ind || 0)); doc.text(ls, L + (o.ind || 0), y, { align: o.justify === false ? 'left' : 'justify', maxWidth: W - (o.ind || 0) }); return y + ls.length * 4.6; };
+    let y = 62;
+    t('Sonderprovisionsvereinbarung', 105, y, { bold: true, align: 'center' });
+    y += 5; t(`für den Monat ${mi.vereinbarung}`, 105, y, { bold: true, align: 'center' });
+    y += 18; t('zwischen der', L, y);
+    y += 9; t('HeTec Shop GmbH, Ludwigstraße 30, 84524 Neuötting', L, y, { bold: true });
+    y += 5; t('– nachstehend „die Gesellschaft“ genannt –', Rr, y, { align: 'right' });
+    y += 5; t('und', L, y);
+    y += 12; t(inp.vollerName || inp.name || '', L, y, { bold: true });
+    y += 5; t('– nachstehend „Arbeitnehmer“ genannt –', Rr, y, { align: 'right' });
+    y += 14;
+    t('1.', L, y);
+    y = para(`Der Arbeitnehmer erhält für den Zeitraum vom ${mi.von || '________'} bis zum ${mi.bis || '________'} eine einmalige Sonderprovision in Höhe von EUR ${e(res.sonder.betrag)} brutto.`, y, { ind: 12 });
+    y += 4; t('2.', L, y); y = para('Anlass der Sonderprovision:', y, { ind: 12, bold: true, justify: false });
+    y = para(res.sonder.text || '—', y, { ind: 12, justify: false });
+    y += 4; t('3.', L, y);
+    y = para(`Die Sonderprovision wird mit der Provisionsabrechnung für ${mi.vereinbarung} ausgezahlt und ist im dort ausgewiesenen Auszahlungsbetrag enthalten.`, y, { ind: 12 });
+    y += 4; t('4.', L, y);
+    y = para('Die Sonderprovision ist eine freiwillige, einmalige Leistung. Auch bei wiederholter Gewährung entsteht kein Rechtsanspruch auf künftige Sonderprovisionen.', y, { ind: 12 });
+    y += 4; t('5.', L, y);
+    y = para('Mündliche Nebenabreden bestehen nicht. Änderungen dieser Vereinbarung bedürfen der Schriftform.', y, { ind: 12 });
+    y += 16;
+    doc.setLineWidth(0.2); doc.line(L, y + 0.6, L + 38, y + 0.6); doc.line(L + 38 + 12, y + 0.6, L + 38 + 12 + 36, y + 0.6);
+    t(', den', L + 38.5, y);
+    doc.setFontSize(8.5); doc.text(String(inp.ort || ''), L + 19, y - 0.4, { align: 'center' }); doc.text(String(inp.datum || ''), L + 68, y - 0.4, { align: 'center' });
+    y += 26;
+    doc.line(L, y, L + 75, y); doc.line(110, y, Rr, y);
+    t('HeTec Shop GmbH', L, y + 3.6, { size: 7.5 }); t('Arbeitnehmer', 110, y + 3.6, { size: 7.5 });
+  }
+
+  // ---------- Import Performance-Excel ----------
+  function cellVal(c) {
+    let v = c && c.value;
+    if (v && typeof v === 'object') { if ('result' in v) v = v.result; else if (v.richText) v = v.richText.map(r => r.text).join(''); else if (v.error) v = null; else v = null; }
+    if (v && typeof v === 'object' && v.error) v = null;
+    if (typeof v === 'string') { const t = v.trim(); if (!t || /^[-–]+$/.test(t) || t.startsWith('#')) return null; const x = parseFloat(t.replace(/[€\s]/g, '').replace(',', '.')); return isFinite(x) ? x : t; }
+    return v == null ? null : v;
+  }
+
+  function parsePerformance(wb) {
+    const norm = s => String(s || '').toLowerCase().replace(/[´'"\s]/g, '');
+    const employees = [];
+    const monthsWithData = new Set();
+    wb.worksheets.forEach(ws => {
+      if (ws.state && ws.state !== 'visible') return;
+      // Kopfzeile suchen (Zeile mit "PO gesamt")
+      let hdr = 0;
+      for (let r = 1; r <= 8 && !hdr; r++) for (let c = 1; c <= 40; c++) if (norm(ws.getCell(r, c).value) === 'pogesamt') { hdr = r; break; }
+      if (!hdr) return;
+      const H = {}; const seen = {};
+      for (let c = 1; c <= 60; c++) {
+        const k = norm(ws.getCell(hdr, c).value); if (!k) continue;
+        seen[k] = (seen[k] || 0) + 1; H[k + '#' + seen[k]] = c;
+      }
+      const col = (k, i = 1) => H[k + '#' + i];
+      const handys = Object.keys(H).find(k => k.startsWith('handy'));
+      const C = {
+        po: col('po"normal"') || col('ponormal'), kombi: col('kombi', 1), kombiData: col('kombi', 2), poGes: col('pogesamt'),
+        vvl: col('vvl', 1), dsl: col('dsl'), dslVvl: col('vvl', 2), schutzOnline: col('schutz'), tv: col('tv'),
+        handys: handys ? H[handys] : null, ks: col('ks'), zubStk: col('stück'), zubMarge: col('marge'),
+        werb: col('versprechen'), pencil: col('selling'), pencilQual: col('qualiät') || col('qualität'),
+        urlaub: col('urlaub'), krank: col('krank'), mktNicht: col('nichterreicht'), mktErr: col('erreicht'), marketing: col('gesamt')
+      };
+      const fullName = String(cellVal(ws.getCell(1, 1)) || ws.name).trim();
+      const rows = {};
+      for (let r = hdr + 1; r <= Math.min(ws.rowCount, hdr + 40); r++) {
+        const m = String(cellVal(ws.getCell(r, 1)) || '').trim();
+        const mi = MONATE.findIndex(x => x.toLowerCase() === m.toLowerCase());
+        if (mi < 0) continue;
+        const g = k => C[k] ? cellVal(ws.getCell(r, C[k])) : null;
+        const d = {}; Object.keys(C).forEach(k => d[k] = g(k));
+        const sales = ['po', 'kombi', 'kombiData', 'vvl', 'dsl', 'dslVvl', 'tv', 'ks', 'handys'].some(k => typeof d[k] === 'number' && d[k] > 0);
+        const any = sales || ['urlaub', 'krank'].some(k => typeof d[k] === 'number' && d[k] > 0);
+        if (any) monthsWithData.add(mi);
+        const warn = [];
+        const num = v => typeof v === 'number' ? v : '';
+        const pc = v => typeof v === 'number' ? Math.round(v * 1000) / 10 : '';
+        if (typeof d.werb === 'number' && (d.werb < 0 || d.werb > 1)) warn.push('Werbeversprechen ungültig (' + pc(d.werb) + ' %)');
+        if (any && d.werb == null) warn.push('Werbeversprechen fehlt');
+        if (any && d.pencil == null) warn.push('Pencil Selling fehlt');
+        if (!C.urlaub || !C.krank) warn.push('Spalte Urlaub/Krank fehlt');
+        const mkt = (d.mktNicht == null && d.mktErr == null) ? '' : num(d.marketing);
+        if (any && mkt === '') warn.push('Marketing fehlt');
+        rows[MONATE[mi]] = {
+          active: any,
+          warn,
+          inp: {
+            po: num(d.po), kombi: num(d.kombi), kombiData: num(d.kombiData), vvl: num(d.vvl), dsl: num(d.dsl), dslVvl: num(d.dslVvl),
+            schutzOnline: num(d.schutzOnline), tv: num(d.tv), handys: num(d.handys), ks: num(d.ks), zubStk: num(d.zubStk), zubMarge: num(d.zubMarge),
+            werb: typeof d.werb === 'number' && d.werb >= 0 && d.werb <= 1 ? pc(d.werb) : '',
+            pencil: pc(d.pencil), pencilQual: pc(d.pencilQual), urlaub: num(d.urlaub), krank: num(d.krank), marketing: mkt, msy: ''
+          }
+        };
+      }
+      employees.push({ sheet: ws.name, fullName, rows });
+    });
+    const months = [...monthsWithData].sort((a, b) => a - b).map(i => MONATE[i]);
+    return { employees, months };
+  }
+
+
+  // ---------- Import Telefonie (WOBIS) ----------
+  function parseTelefonie(wb) {
+    const ws = wb.worksheets.find(w => !w.state || w.state === 'visible') || wb.worksheets[0];
+    const list = [];
+    for (let r = 1; r <= ws.rowCount; r++) {
+      const a = cellVal(ws.getCell(r, 1)), b = cellVal(ws.getCell(r, 2));
+      if (typeof a === 'string' && typeof b === 'number') list.push({ name: a.trim(), tel: b });
+    }
+    return list;
+  }
+  const tokens = s => String(s || '').toLowerCase().normalize('NFC').split(/[\s\-,.]+/).filter(t => t.length > 1);
+  function matchTelefonie(fullName, list) {
+    if (!list || !list.length) return null;
+    const p = tokens(fullName);
+    const hits = list.filter(x => { const w = tokens(x.name); return p.every(t => w.includes(t)) || (w.length && w.every(t => p.includes(t))); });
+    return hits.length === 1 ? hits[0] : null;
+  }
+
+  root.Provi = { parseTelefonie, matchTelefonie, parsePerformance, MONATE, monatsInfo, RULES_VERSION, DEFAULT_RULES, KORR_LABELS, GS, calc, buildXlsx, buildPdf, regularien, eur, pf };
+  if (typeof module !== 'undefined') module.exports = root.Provi;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script type="text/babel" data-presets="react">const { useState, useMemo, useEffect, useRef } = React;
+const GS_LABELS = { werb: 'Werbeversprechen', pencil: 'Pencil Selling', marketing: 'Marketing / Telefonie', tv: 'o2 TV', os: 'Online-Schutz' };
+const { parseTelefonie, matchTelefonie, parsePerformance, MONATE, RULES_VERSION, DEFAULT_RULES, KORR_LABELS, calc, buildXlsx, buildPdf, eur, pf } = window.Provi;
+
+const heute = () => new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const BLANK = { po: '', kombi: '', kombiData: '', vvl: '', dsl: '', dslVvl: '', schutzOnline: '', tv: '', handys: '', ks: '', zubStk: '', zubMarge: '', werb: '', pencil: '', pencilQual: '', urlaub: '', krank: '', fachhandel: '', marketing: '', msy: '', arbeitstage: '25', arbeitstageVon: '25' };
+const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+const safe = s => String(s || '').replace(/[^\wäöüÄÖÜß-]+/g, '_');
+const fname = (inp, ext) => `Provision_${safe(inp.name || 'Mitarbeiter')}_${safe(inp.monat)}_${inp.jahr || ''}.${ext}`;
+function b64ToBuf(b) { const s = atob(b); const a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a.buffer; }
+function download(blob, name) { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); }
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const num = v => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString('de-DE');
+const show = v => v === '' || v == null ? '–' : num(v);
+
+const SL_DEFAULTS = { Hitzler: { on: true, r1: '5', r2: '10', ziel: '12500' }, Enenkel: { on: true, r1: '2.5', r2: '5', ziel: '21000' } };
+const SL_KEYS = ['shopleiter', 'slRate1', 'slRate2', 'slZiel', 'slIst'];
+
+const GROUPS = [
+  { title: 'Mobilfunk', fields: [['po', 'Postpaid „normal“'], ['kombi', 'Kombi'], ['kombiData', 'Kombi Data'], ['vvl', 'VVL'], ['handys', 'Handys'], ['ks', 'Komplettschutz']] },
+  { title: 'DSL, TV & Zubehör', fields: [['dsl', 'DSL Neu'], ['dslVvl', 'DSL VVL'], ['tv', 'o2 TV'], ['schutzOnline', 'Online-Schutz'], ['zubStk', 'Zubehör Stück'], ['zubMarge', 'Zubehör Marge €'], ['fachhandel', 'Fachhandel Aktivierungen']] },
+  { title: 'Qualität (leer = Abzug)', fields: [['werb', 'Werbeversprechen (DNE) %'], ['pencil', 'Pencil Selling %'], ['pencilQual', 'Pencil Qualität %'], ['marketing', 'Marketing / Telefonie'], ['msy', 'MSY %']] },
+  { title: 'Abwesenheit & Arbeitstage', fields: [['urlaub', 'Urlaub (Tage)'], ['krank', 'Krank/Schulung (Tage)'], ['arbeitstage', 'Arbeitstage'], ['arbeitstageVon', 'von Arbeitstagen']] }
+];
+const RULE_GROUPS = [
+  ['Postpaid', [['ppSchwelle', 'provisioniert ab Stück über', 1], ['ppBetrag', '€ je Vertrag', 1]]],
+  ['Komplettschutz', [['ksAb', 'ab Stück', 1], ['ksBetrag', '€ je Stück', 1]]],
+  ['DSL', [['dslSchwelle', 'provisioniert ab Stück über', 1], ['dslSoll', 'DSL-Quote Soll %', 100], ['dslBetragNiedrig', '€ bei Quote bis Soll', 1], ['dslBetragHoch', '€ bei Quote über Soll', 1], ['dslVvlBetrag', 'DSL VVL € je Stück', 1]]],
+  ['VVL & Zubehör', [['vvlSchwelle', 'VVL provisioniert ab Stück über', 1], ['vvlBetrag', 'VVL € je Stück', 1], ['zubSchwelle', 'Zubehör-Marge Freibetrag €', 1], ['zubAnteil', 'Zubehör-Anteil %', 100], ['fhBetrag', 'Fachhandel € je Aktivierung', 1]]],
+  ['Urlaub/Krankheit', [['abwBetrag', '€ je Tag', 1]]],
+  ['Qualitätsziele', [['abzug', 'Abzug je verfehltem Ziel %', 100], ['werbSoll', 'Werbeversprechen Soll %', 100], ['pencilSoll', 'Pencil Selling Soll %', 100], ['marketingSoll', 'Marketing/Telefonie Soll', 1], ['tvSoll', 'o2 TV Soll (Vollzeit)', 1], ['osSoll', 'Online-Schutz Soll (Vollzeit)', 1], ['tvSollTZ', 'o2 TV Soll (Azubi/Teilzeit)', 1], ['osSollTZ', 'Online-Schutz Soll (Azubi/Teilzeit)', 1]]],
+  ['Boni & Fix', [['msySoll', 'MSY Soll %', 100], ['msyBonus', 'MSY Bonus €', 1], ['fix', 'Fixprovision €', 1]]]
+];
+
+function Field({ label, value, onChange, type = 'number', placeholder }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <input type={type} inputMode={type === 'number' ? 'decimal' : undefined} value={value ?? ''} placeholder={placeholder} onChange={e => onChange(e.target.value)} />
+    </label>
+  );
+}
+
+function Rules({ R, setR }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card">
+      <button className="link" onClick={() => setOpen(o => !o)} aria-expanded={open}>{open ? 'Regeln ausblenden' : 'Regeln anpassen'}</button>
+      {open && (<>
+        {RULE_GROUPS.map(([t, fs]) => (
+          <div key={t} className="rulegroup"><h3>{t}</h3>
+            <div className="grid rules">{fs.map(([k, l, m]) => (
+              <Field key={k} label={l} value={String(Math.round(R[k] * m * 1000) / 1000)} onChange={v => setR(s => ({ ...s, [k]: (parseFloat(String(v).replace(',', '.')) || 0) / m }))} />
+            ))}</div>
+          </div>))}
+        <button className="link" onClick={() => setR({ ...DEFAULT_RULES, _v: RULES_VERSION })}>Standardregeln wiederherstellen</button>
+      </>)}
+    </div>
+  );
+}
+
+function Sheet({ inp, res, R }) {
+  return (
+    <aside className="sheet">
+      <div className="sheethead">
+        <div><small>Mitarbeiter</small><strong>{inp.vollerName || inp.name || '–'}</strong></div>
+        <div><small>Monat</small><strong>{inp.monat} {inp.jahr}</strong></div>
+      </div>
+      <div className="quotes">
+        <span className={res.q.dsl > R.dslSoll ? 'ok' : 'no'}>DSL {pf(res.q.dsl)}</span>
+        <span>KS {pf(res.q.ks)}</span>
+      </div>
+      <table className="calc"><tbody>
+        {res.rows.map(r => (
+          <tr key={r.row} className={r.aus ? '' : 'zero'}>
+            <td>{r.label}<small>{r.row === 'push' ? 'exklusiv' : r.euro ? eur(r.rel) : num(r.rel) + ' × ' + eur(r.betrag)}</small></td>
+            <td className="amt">{eur(r.aus)}</td>
+          </tr>))}
+        <tr className="sum"><td>Summe Provision</td><td className="amt">{eur(res.summe)}</td></tr>
+        {res.sl && <tr className={res.sl.betrag ? 'pos' : 'zero'}><td>Shopleiter-Provision<small>Ziel {eur(res.sl.ziel)} · Ist {eur(res.sl.ist)} · {pf(res.sl.quote)}</small></td><td className="amt">{eur(res.sl.betrag)}</td></tr>}
+        {res.qual.map(x => (
+          <tr key={x.row} className={x.betrag ? 'neg' : 'zero'}>
+            <td>{x.label}<small>{x.rated ? `Soll ${x.fmt === 'pct' ? pf(x.soll) : num(x.soll)} · Ist ${x.fmt === 'pct' ? pf(x.ist) : num(x.ist)}` : 'fehlt – Abzug'}</small></td>
+            <td className="amt">{eur(x.betrag)}</td>
+          </tr>))}
+        <tr className={res.msy.betrag ? 'pos' : 'zero'}><td>{res.msy.label}</td><td className="amt">{eur(res.msy.betrag)}</td></tr>
+        {res.korr.filter(k => k.betrag).map(k => <tr key={k.row} className="pos"><td>{k.label}<small>{k.note}</small></td><td className="amt">{eur(k.betrag)}</td></tr>)}
+        {res.sonder.betrag !== 0 && <tr className="pos"><td>Sonderprovision<small>{res.sonder.text || 'ohne Anlass'}</small></td><td className="amt">{eur(res.sonder.betrag)}</td></tr>}
+      </tbody></table>
+      <div className="total">
+        <span>Auszahlungsbetrag</span>
+        <strong>{eur(res.total)}</strong>
+        {res.fixGreift && <em>Fixprovision greift (berechnet {eur(res.brutto)})</em>}
+      </div>
+    </aside>
+  );
+}
+
+function Editor({ inp, R, onPatch, onReset, onBack, onXlsx, onPdf, busy, imported }) {
+  const res = useMemo(() => calc(inp, R), [inp, R]);
+  const up = k => v => onPatch({ [k]: v });
+  return (
+    <>
+      <div className="bar">
+        <button className="ghost" onClick={onBack}>Zurück zur Übersicht</button>
+        {imported && <button className="link" onClick={onReset}>Importwerte wiederherstellen</button>}
+      </div>
+      <main>
+        <section className="inputs">
+          <div className="card">
+            <h2>Mitarbeiter</h2>
+            <label className="check" style={{ marginBottom: 12 }}><input type="checkbox" checked={!!inp.teilzeit} onChange={e => onPatch({ teilzeit: e.target.checked })} /> Azubi / Teilzeit (Ziel {R.tvSollTZ} TV, {R.osSollTZ} Online-Schutz)</label>
+            <div className="grid">
+              <Field label="Name (Abrechnung)" type="text" value={inp.name} onChange={up('name')} />
+              <Field label="Vor- und Nachname (Vereinbarung)" type="text" value={inp.vollerName} onChange={up('vollerName')} />
+            </div>
+          </div>
+          <div className="card special">
+            <h2>Sonderprovision</h2>
+            <div className="grid two">
+              <Field label="Betrag €" value={inp.sonderBetrag} onChange={up('sonderBetrag')} />
+              <Field label="Anlass / Zusatztext" type="text" value={inp.sonderText} onChange={up('sonderText')} />
+            </div>
+          </div>
+          <div className="card">
+            <h2>Push-Provision</h2>
+            <div className="grid two">
+              <Field label="Betrag €" value={inp.pushBetrag} onChange={up('pushBetrag')} />
+              <Field label="Bezeichnung (z. B. o2 TV Push)" type="text" value={inp.pushText} onChange={up('pushText')} />
+            </div>
+          </div>
+          <div className="card special">
+            <label className="check"><input type="checkbox" checked={!!inp.shopleiter} onChange={e => onPatch({ shopleiter: e.target.checked })} /> Shopleiter-Provision hinterlegen</label>
+            {inp.shopleiter && (<div className="grid sl">
+              <Field label="Margenziel Shop €" value={inp.slZiel} onChange={up('slZiel')} />
+              <Field label="Marge Ist €" value={inp.slIst} onChange={up('slIst')} />
+              <Field label="Satz 75–100 % (%)" value={inp.slRate1} onChange={up('slRate1')} />
+              <Field label="Satz über 100 % (%)" value={inp.slRate2} onChange={up('slRate2')} />
+              {res.sl && <p className="slres">Zielerreichung {pf(res.sl.quote)} → <b>{eur(res.sl.betrag)}</b></p>}
+            </div>)}
+          </div>
+          {GROUPS.map(g => (
+            <div className="card" key={g.title}>
+              <h2>{g.title}</h2>
+              <div className="grid">{g.fields.map(([k, l]) => <Field key={k} label={l} value={inp[k]} onChange={up(k)} />)}</div>
+            </div>
+          ))}
+          <div className="card">
+            <h2>Gutschrift / Kulanz</h2>
+            <div className="gslist">
+              {res.korr.filter(k => k.key !== 'sonst').map(k => {
+                const mode = inp['gs_' + k.key] || '';
+                const set = m => onPatch({ ['gs_' + k.key]: mode === m ? '' : m });
+                return (
+                  <div className={'gsrow' + (k.abzug > 0 ? '' : ' none')} key={k.key}>
+                    <div className="gsname"><strong>{GS_LABELS[k.key]}</strong><small>{k.abzug > 0 ? 'Abzug ' + eur(-k.abzug) : 'kein Abzug'}</small></div>
+                    <label className="check"><input type="checkbox" disabled={!(k.abzug > 0)} checked={mode === 'voll'} onChange={() => set('voll')} /> Gutschrift</label>
+                    <label className="check"><input type="checkbox" disabled={!(k.abzug > 0)} checked={mode === 'teil'} onChange={() => set('teil')} /> Gutschrift mit Teilzahlung</label>
+                    {mode === 'teil' && k.abzug > 0 && <label className="field inline"><span>Betrag €</span><input type="number" inputMode="decimal" value={inp['gsb_' + k.key] ?? ''} onChange={e => onPatch({ ['gsb_' + k.key]: e.target.value })} /></label>}
+                    {k.betrag > 0 && <span className="gsres">+ {eur(k.betrag)}</span>}
+                  </div>);
+              })}
+            </div>
+            <div className="grid two" style={{ marginTop: 14 }}>
+              <Field label="Sonstige Korrektur €" value={inp.korrSonst} onChange={up('korrSonst')} />
+              <Field label="Grund" type="text" value={inp.korrSonstText} onChange={up('korrSonstText')} />
+            </div>
+          </div>
+        </section>
+        <div>
+          <Sheet inp={inp} res={res} R={R} />
+          <div className="actions">
+            <button onClick={onXlsx} disabled={!!busy}>{busy === 'xlsx' ? 'Erstelle …' : 'Excel herunterladen'}</button>
+            <button onClick={onPdf} disabled={!!busy}>{busy === 'pdf' ? 'Erstelle …' : 'PDF herunterladen'}</button>
+          </div>
+        </div>
+      </main>
+    </>
+  );
+}
+
+function App() {
+  const [R, setR] = useState(() => { const s = load('provi_rules', {}); return s && s._v === RULES_VERSION ? { ...DEFAULT_RULES, ...s } : { ...DEFAULT_RULES, _v: RULES_VERSION }; });
+  const [data, setData] = useState(() => load('provi_data', null));
+  const [meta, setMeta] = useState(() => load('provi_meta', { monat: '', jahr: String(new Date().getFullYear()), ort: '', datum: heute() }));
+  const [ov, setOv] = useState(() => load('provi_ov', {}));
+  const [slSet, setSlSet] = useState(() => load('provi_sl', SL_DEFAULTS));
+  const [tzSet, setTzSet] = useState(() => load('provi_tz', {}));
+  const [manual, setManual] = useState(() => load('provi_manual', { ...BLANK, name: '', vollerName: '' }));
+  const [edit, setEdit] = useState(null); // sheet-Name | '__manual'
+  const [busy, setBusy] = useState('');
+  const [msg, setMsg] = useState('');
+  const [drag, setDrag] = useState(false);
+  const fileRef = useRef();
+  const telRef = useRef();
+  useEffect(() => save('provi_rules', R), [R]);
+  useEffect(() => save('provi_data', data), [data]);
+  useEffect(() => save('provi_meta', meta), [meta]);
+  useEffect(() => save('provi_ov', ov), [ov]);
+  useEffect(() => save('provi_sl', slSet), [slSet]);
+  useEffect(() => save('provi_tz', tzSet), [tzSet]);
+  useEffect(() => save('provi_manual', manual), [manual]);
+
+  const key = sheet => `${meta.jahr}|${meta.monat}|${sheet}`;
+  const shared = { monat: meta.monat, jahr: meta.jahr, ort: meta.ort, datum: meta.datum };
+
+  const list = useMemo(() => {
+    if (!data || !meta.monat) return [];
+    return data.employees.filter(e => e.rows[meta.monat]).map(e => {
+      const row = e.rows[meta.monat];
+      const o = ov[key(e.sheet)] || {};
+      const tel = data.telefonie ? matchTelefonie(e.fullName, data.telefonie.list) : null;
+      const base = { ...BLANK, ...row.inp, ...(tel ? { marketing: tel.tel } : {}) };
+      const sl = slSet[e.sheet] || {};
+      const inp = { ...base, name: e.sheet, vollerName: e.fullName, ...shared, ...(o.fields || {}),
+        teilzeit: !!tzSet[e.sheet], shopleiter: !!sl.on, slRate1: sl.r1 ?? '', slRate2: sl.r2 ?? '', slZiel: (o.fields || {}).slZiel ?? sl.ziel ?? '', slIst: (o.fields || {}).slIst ?? '' };
+      const include = o.include ?? row.active;
+      const todo = [];
+      const ov2 = o.fields || {};
+      if (inp.werb === '') todo.push(row.warn.find(w => w.startsWith('Werbeversprechen ungültig')) || 'Werbeversprechen fehlt');
+      if (inp.pencil === '') todo.push('Pencil Selling fehlt');
+      if (inp.marketing === '') todo.push(data.telefonie ? 'Telefonie: Name nicht gefunden' : 'Telefonie fehlt');
+      if (inp.shopleiter && !(Number(inp.slZiel) > 0)) todo.push('Shopleiter: Margenziel fehlt');
+      if (inp.shopleiter && inp.slIst === '') todo.push('Shopleiter: Marge-Ist fehlt');
+      if (!('urlaub' in ov2) && row.warn.includes('Spalte Urlaub/Krank fehlt')) todo.push('Urlaub/Krank fehlt');
+      const res0 = calc(inp, R);
+      const credited = id => { const qx = res0.qual.find(q => q.row === id); const k = res0.korr.find(c => c.key === id); return !!(qx && k && qx.betrag < 0 && k.betrag >= -qx.betrag); };
+      const todoF = todo.filter(t => !((t.startsWith('Werbeversprechen') && credited('werb')) || (t.startsWith('Pencil') && credited('pencil')) || (t.startsWith('Telefonie') && credited('marketing'))));
+      return { e, row, inp, include, todo: todoF, tel, credited, edited: !!(o.fields && Object.keys(o.fields).some(k => !['sonderBetrag', 'sonderText', 'slZiel', 'slIst'].includes(k))), res: res0 };
+    });
+  }, [data, meta, ov, R, slSet, tzSet]);
+  const chosen = list.filter(x => x.include);
+  const sum = chosen.reduce((s, x) => s + x.res.total, 0);
+
+  const patchSl = (sheet, p) => {
+    const s = {}; const month = {};
+    if ('teilzeit' in p) setTzSet(x => ({ ...x, [sheet]: !!p.teilzeit }));
+    if ('shopleiter' in p) s.on = p.shopleiter;
+    if ('slRate1' in p) s.r1 = p.slRate1;
+    if ('slRate2' in p) s.r2 = p.slRate2;
+    if ('slZiel' in p) { s.ziel = p.slZiel; month.slZiel = p.slZiel; }
+    if ('slIst' in p) month.slIst = p.slIst;
+    if (Object.keys(s).length) setSlSet(x => ({ ...x, [sheet]: { r1: '5', r2: '10', ...(x[sheet] || {}), ...s } }));
+    const rest = Object.fromEntries(Object.entries(p).filter(([k]) => !['teilzeit', 'shopleiter', 'slRate1', 'slRate2'].includes(k)));
+    if (Object.keys(rest).length) patch(sheet, { fields: rest });
+  };
+  const patch = (sheet, p) => setOv(s => { const k = key(sheet); const cur = s[k] || {}; return { ...s, [k]: { ...cur, ...('include' in p ? { include: p.include } : {}), fields: { ...(cur.fields || {}), ...(p.fields || {}) } } }; });
+
+  async function readFile(file) {
+    setMsg(''); setBusy('import');
+    try {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(await file.arrayBuffer());
+      const d = parsePerformance(wb);
+      if (!d.employees.length) throw new Error('Keine Mitarbeiterblätter mit Spalte „PO gesamt“ gefunden.');
+      setData(old => ({ ...d, telefonie: old?.telefonie, file: file.name, loaded: new Date().toISOString() }));
+      setMeta(m => ({ ...m, monat: d.months.includes(m.monat) ? m.monat : (d.months[d.months.length - 1] || MONATE[0]) }));
+      setMsg(`${d.employees.length} Mitarbeiter aus „${file.name}“ eingelesen.`);
+    } catch (e) { setMsg('Datei konnte nicht gelesen werden: ' + e.message); }
+    setBusy('');
+  }
+
+  async function readTel(file) {
+    setMsg(''); setBusy('tel');
+    try {
+      const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer());
+      const list = parseTelefonie(wb);
+      if (!list.length) throw new Error('Keine Zeilen mit Name (Spalte A) und Telefonie (Spalte B) gefunden.');
+      setData(d => ({ ...(d || { employees: [], months: [] }), telefonie: { file: file.name, list } }));
+      setMsg(`Telefoniewerte für ${list.length} Personen aus „${file.name}“ eingelesen.`);
+    } catch (e) { setMsg('Telefonie-Datei konnte nicht gelesen werden: ' + e.message); }
+    setBusy('');
+  }
+  async function oneXlsx(inp) { setBusy('xlsx'); try { const { buffer } = await buildXlsx(ExcelJS, null, inp, R); download(new Blob([buffer], { type: XLSX_MIME }), fname(inp, 'xlsx')); } catch (e) { setMsg('Excel-Fehler: ' + e.message); } setBusy(''); }
+  function onePdf(inp) { setBusy('pdf'); try { buildPdf(window.jspdf.jsPDF, inp, R).save(fname(inp, 'pdf')); } catch (e) { setMsg('PDF-Fehler: ' + e.message); } setBusy(''); }
+
+  async function buildZip() {
+      const zip = new JSZip();
+      for (const x of chosen) {
+        zip.file('PDF/' + fname(x.inp, 'pdf'), buildPdf(window.jspdf.jsPDF, x.inp, R).output('arraybuffer'));
+        const { buffer } = await buildXlsx(ExcelJS, null, x.inp, R);
+        zip.file('Excel/' + fname(x.inp, 'xlsx'), buffer);
+      }
+      // Übersicht
+      const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Übersicht');
+      ws.columns = [{ header: 'Mitarbeiter', width: 28 }, { header: 'Blatt', width: 16 }, { header: 'PO gesamt', width: 10 }, { header: 'VVL', width: 8 }, { header: 'DSL', width: 8 }, { header: 'KS', width: 8 }, { header: 'Summe Provision', width: 16 }, { header: 'Shopleiter-Provision', width: 18 }, { header: 'Abzüge Qualität', width: 16 }, { header: 'Sonderprovision', width: 16 }, { header: 'Anlass', width: 36 }, { header: 'Auszahlung', width: 14 }, { header: 'Hinweis', width: 60 }];
+      chosen.forEach(x => ws.addRow([x.inp.vollerName, x.e.sheet, x.res.q.poGes, Number(x.inp.vvl) || 0, Number(x.inp.dsl) || 0, Number(x.inp.ks) || 0, x.res.summe, x.res.sl ? x.res.sl.betrag : 0, x.res.qual.reduce((s, q) => s + q.betrag, 0), x.res.sonder.betrag, x.res.sonder.text, x.res.total, x.todo.length ? 'Handlungsbedarf: ' + x.todo.join(', ') : '']));
+      chosen.forEach((x, k) => { if (x.todo.length) ws.getRow(k + 2).eachCell({ includeEmpty: true }, c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE0E0' } }; }); });
+      const last = chosen.length + 1;
+      ws.addRow(['Gesamt', '', '', '', '', '', ...['G', 'H', 'I', 'J'].map(c => ({ formula: `SUM(${c}2:${c}${last})` })), '', { formula: `SUM(L2:L${last})` }]);
+      ws.getRow(1).font = { bold: true, name: 'Arial' }; ws.getRow(last + 1).font = { bold: true, name: 'Arial' };
+      ['G', 'H', 'I', 'J', 'L'].forEach(c => ws.getColumn(c).numFmt = '#,##0.00 "€"');
+      zip.file(`Uebersicht_${safe(meta.monat)}_${meta.jahr}.xlsx`, await wb.xlsx.writeBuffer());
+      return zip.generateAsync({ type: 'uint8array' });
+  }
+  const zipName = () => `Provisionen_${safe(meta.monat)}_${meta.jahr}.zip`;
+
+  async function generateAll() {
+    if (!chosen.length) return;
+    setBusy('zip'); setMsg('');
+    try {
+      download(new Blob([await buildZip()], { type: 'application/zip' }), zipName());
+      setMsg(`${chosen.length} Abrechnungen erstellt.`);
+    } catch (e) { setMsg('Fehler beim Erstellen: ' + e.message); }
+    setBusy('');
+  }
+
+  function mailText() {
+    const lines = chosen.map(x => `${x.inp.vollerName || x.e.sheet}: ${eur(x.res.total)}`);
+    const sum = chosen.reduce((s, x) => s + x.res.total, 0);
+    return `Hallo,\n\nanbei die Provisionen für ${meta.monat} ${meta.jahr}.\n\n${lines.join('\n')}\n\nGesamt: ${eur(sum)} (${chosen.length} Mitarbeiter)\n\nDie Abrechnungen (PDF und Excel) sowie die Übersicht liegen als ZIP im Anhang.\n\nViele Grüße`;
+  }
+
+  async function sendMail() {
+    if (!chosen.length) return;
+    setBusy('mail'); setMsg('');
+    try {
+      const zipBytes = await buildZip();
+      const subject = `Provisionen ${meta.monat} ${meta.jahr}`;
+      const text = mailText();
+      const b64 = bytes => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); };
+      const utf8 = s => new TextEncoder().encode(s);
+      const wrap = s => s.replace(/.{1,76}/g, '$&\r\n');
+      const bnd = '----=_HeTec_' + Date.now(), alt = '----=_HeTecAlt_' + Date.now();
+      const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const sumAll = chosen.reduce((s, x) => s + x.res.total, 0);
+      const td = 'padding:6px 12px;border:1px solid #BFC6D1;font-family:Calibri,Arial,sans-serif;font-size:11pt;';
+      const th = td + 'background:#0A1F44;color:#ffffff;font-weight:bold;text-align:left;';
+      const html = `<html><body style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#000">
+<p>Hallo,</p><p>anbei die Provisionen für ${esc(meta.monat)} ${esc(meta.jahr)}.</p>
+<table cellspacing="0" cellpadding="0" style="border-collapse:collapse">
+<tr><th style="${th}">Vorname</th><th style="${th}">Nachname</th><th style="${th}text-align:right">Provision</th></tr>
+${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim().split(/\s+/); const vn = nm.length > 1 ? nm[0] : ''; const nn = nm.length > 1 ? nm.slice(1).join(' ') : nm[0];
+  const bg = k % 2 ? 'background:#F2F4F8;' : ''; return `<tr><td style="${td}${bg}">${esc(vn)}</td><td style="${td}${bg}">${esc(nn)}</td><td style="${td}${bg}text-align:right">${esc(eur(x.res.total))}</td></tr>`; }).join('\n')}
+<tr><td colspan="2" style="${td}font-weight:bold;background:#E8EEFF">Gesamt (${chosen.length} Mitarbeiter)</td><td style="${td}font-weight:bold;text-align:right;background:#E8EEFF">${esc(eur(sumAll))}</td></tr>
+</table>
+<p>Die Abrechnungen (PDF und Excel) sowie die Übersicht liegen als ZIP im Anhang.</p><p>Viele Grüße</p><script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
+</body></html>`;
+      const eml = [
+        `To: ${meta.mailTo || ''}`,
+        `Subject: =?UTF-8?B?${b64(utf8(subject))}?=`,
+        'X-Unsent: 1',
+        'MIME-Version: 1.0',
+        `Content-Type: multipart/mixed; boundary="${bnd}"`,
+        '',
+        `--${bnd}`,
+        `Content-Type: multipart/alternative; boundary="${alt}"`,
+        '',
+        `--${alt}`,
+        'Content-Type: text/plain; charset="UTF-8"',
+        'Content-Transfer-Encoding: base64',
+        '',
+        wrap(b64(utf8(text.replace(/\n/g, '\r\n')))),
+        `--${alt}`,
+        'Content-Type: text/html; charset="UTF-8"',
+        'Content-Transfer-Encoding: base64',
+        '',
+        wrap(b64(utf8(html))),
+        `--${alt}--`,
+        '',
+        `--${bnd}`,
+        `Content-Type: application/zip; name="${zipName()}"`,
+        'Content-Transfer-Encoding: base64',
+        `Content-Disposition: attachment; filename="${zipName()}"`,
+        '',
+        wrap(b64(zipBytes)),
+        `--${bnd}--`,
+        ''
+      ].join('\r\n');
+      download(new Blob([eml], { type: 'message/rfc822' }), `Provisionen_${safe(meta.monat)}_${meta.jahr}.eml`);
+      try { await navigator.clipboard.writeText(text); } catch (e) {}
+      setMsg('E-Mail-Entwurf heruntergeladen: Datei öffnen, sie erscheint in Outlook mit ZIP im Anhang. Der Text ist zusätzlich in der Zwischenablage.');
+    } catch (e) { setMsg('E-Mail konnte nicht erstellt werden: ' + e.message); }
+    setBusy('');
+  }
+
+  // Editor-Ansicht
+  if (edit) {
+    if (edit === '__manual') {
+      const inp = { ...manual, ...shared, ...(manual.monatOwn ? { monat: manual.monat } : {}) };
+      return (<div className="wrap"><Header />
+        <Editor inp={inp} R={R} busy={busy} onBack={() => setEdit(null)} onPatch={p => setManual(m => ({ ...m, ...p }))} onReset={() => {}}
+          onXlsx={() => oneXlsx(inp)} onPdf={() => onePdf(inp)} imported={false} /></div>);
+    }
+    const x = list.find(l => l.e.sheet === edit);
+    if (x) return (<div className="wrap"><Header />
+      <Editor inp={x.inp} R={R} busy={busy} imported onBack={() => setEdit(null)}
+        onPatch={p => patchSl(edit, p)}
+        onReset={() => setOv(s => { const k = key(edit); const f = s[k]?.fields || {}; return { ...s, [k]: { ...s[k], fields: { sonderBetrag: f.sonderBetrag, sonderText: f.sonderText, slZiel: f.slZiel, slIst: f.slIst } } }; })}
+        onXlsx={() => oneXlsx(x.inp)} onPdf={() => onePdf(x.inp)} /></div>);
+  }
+
+  return (
+    <div className="wrap">
+      <Header />
+      <div
+        className={'drop' + (drag ? ' over' : '')}
+        onDragOver={e => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
+        onDrop={e => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) readFile(f); }}
+        onClick={() => fileRef.current.click()} role="button" tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileRef.current.click(); }}>
+        <input ref={fileRef} type="file" accept=".xlsx,.xlsm" hidden onChange={e => { const f = e.target.files[0]; if (f) readFile(f); e.target.value = ''; }} />
+        <strong>{busy === 'import' ? 'Lese Datei …' : data ? 'Neue Performance-Excel einlesen' : 'Performance-Excel hier ablegen'}</strong>
+        <span>{data ? `Aktuell: ${data.file} · ${data.employees.length} Mitarbeiter` : 'oder klicken, um die Monatsdatei auszuwählen'}</span>
+      </div>
+      <div className="drop small"
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) readTel(f); }}
+        onClick={() => telRef.current.click()} role="button" tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') telRef.current.click(); }}>
+        <input ref={telRef} type="file" accept=".xlsx,.xlsm" hidden onChange={e => { const f = e.target.files[0]; if (f) readTel(f); e.target.value = ''; }} />
+        <strong>{busy === 'tel' ? 'Lese Datei …' : 'Telefonie-Excel (WOBIS) ablegen'}</strong>
+        <span>{data?.telefonie ? `Aktuell: ${data.telefonie.file} · ${data.telefonie.list.length} Personen` : 'Spalte A Name, Spalte B Telefonie – ersetzt den Marketingwert'}</span>
+      </div>
+      {msg && <p className="msg">{msg}</p>}
+
+      <div className="card">
+        <div className="grid meta">
+          <label className="field"><span>Abrechnungsmonat</span>
+            <select value={meta.monat} onChange={e => setMeta(m => ({ ...m, monat: e.target.value }))}>
+              <option value="" disabled>Monat wählen</option>
+              {MONATE.map(m => <option key={m} value={m}>{m}{data && !data.months.includes(m) ? ' (keine Daten)' : ''}</option>)}
+            </select>
+          </label>
+          <Field label="Jahr" value={meta.jahr} onChange={v => setMeta(m => ({ ...m, jahr: v }))} />
+          <Field label="Ort (Vereinbarung)" type="text" value={meta.ort} onChange={v => setMeta(m => ({ ...m, ort: v }))} />
+          <Field label="Datum" type="text" value={meta.datum} onChange={v => setMeta(m => ({ ...m, datum: v }))} />
+        </div>
+      </div>
+
+      {list.length > 0 ? (
+        <div className="card tablecard">
+          <div className="tablehead">
+            <h2>{meta.monat} {meta.jahr}</h2>
+            <span>{chosen.length} von {list.length} ausgewählt · {chosen.filter(x => x.todo.length).length} mit Handlungsbedarf · Auszahlung gesamt <b>{eur(sum)}</b></span>
+          </div>
+          <div className="scroll">
+            <table className="list">
+              <thead><tr>
+                <th></th><th>Mitarbeiter</th>
+                <th className="n">PO</th><th className="n">VVL</th><th className="n">DSL</th><th className="n">KS</th><th className="n">TV</th><th className="n">OS</th>
+                <th className="n">DNE</th><th className="n">Pencil</th><th className="n">Tel.</th><th className="n">Abw.</th>
+                <th>Sonderprovision</th><th className="r">Auszahlung</th><th></th>
+              </tr></thead>
+              <tbody>
+                {list.map(x => {
+                  const i = x.inp, f = (ov[key(x.e.sheet)] || {}).fields || {};
+                  const pc = v => v === '' ? '–' : num(v) + '%';
+                  return (
+                    <React.Fragment key={x.e.sheet}>
+                    <tr className={(x.include ? '' : 'off') + (i.shopleiter ? ' hassl' : '')}>
+                      <td className="cb">{x.todo.length > 0 && x.include && <span className="dot" title="Handlungsbedarf" />}<input type="checkbox" aria-label={'Einbeziehen: ' + x.e.fullName} checked={x.include} onChange={ev => patch(x.e.sheet, { include: ev.target.checked })} /></td>
+                      <td className="who">
+                        <strong>{x.e.fullName}</strong>
+                        <span className="toggles">
+                          <label className="tgl"><input type="checkbox" checked={!!i.teilzeit} onChange={ev => patchSl(x.e.sheet, { teilzeit: ev.target.checked })} />Azubi/TZ</label>
+                          <label className="tgl"><input type="checkbox" checked={!!i.shopleiter} onChange={ev => patchSl(x.e.sheet, { shopleiter: ev.target.checked })} />Shopleiter</label>
+                          {x.edited && <small className="tag">bearbeitet</small>}
+                          {!x.row.active && <small className="tag">keine Werte</small>}
+                        </span>
+                        {(() => {
+                          const SH = { werb: 'Werbeversprechen', pencil: 'Pencil Selling', marketing: 'Telefonie', tv: 'o2 TV', os: 'Online-Schutz' };
+                          const ab = x.res.qual.filter(q => q.betrag < 0 && !x.credited(q.row));
+                          if (!ab.length) return null;
+                          return (<div className="abz">{ab.map(q => {
+                            const k = x.res.korr.find(c => c.key === q.row);
+                            return <span key={q.row} className="chip neg" title={k && k.note ? k.note : 'Abzug ' + (q.fmt === 'pct' ? `Soll ${pf(q.soll)} · Ist ${q.rated ? pf(q.ist) : 'fehlt'}` : `Soll ${num(q.soll)} · Ist ${num(q.ist)}`)}>
+                              {SH[q.row]} {eur(q.betrag)}{k && k.betrag ? ' · Teilgutschrift ' + eur(k.betrag) : ''}
+                            </span>;
+                          })}</div>);
+                        })()}
+                        {x.todo.length > 0 && <small className="todo">Handlungsbedarf: {x.todo.join(', ')}</small>}
+                      </td>
+                      <td className="n">{show(x.res.q.poGes)}</td><td className="n">{show(i.vvl)}</td><td className="n">{show(i.dsl)}</td><td className="n">{show(i.ks)}</td>
+                      {(() => { const bad = id => (x.res.qual.find(q => q.row === id) || {}).betrag < 0 && !x.credited(id) ? 'n bad' : 'n'; return (<>
+                      <td className={bad('tv')}>{show(i.tv)}</td><td className={bad('os')}>{show(i.schutzOnline)}</td>
+                      <td className={bad('werb')}>{pc(i.werb)}</td><td className={bad('pencil')}>{pc(i.pencil)}</td><td className={bad('marketing')}>{show(i.marketing)}</td></>); })()}
+                      <td className="n">{num((Number(i.urlaub) || 0) + (Number(i.krank) || 0))}</td>
+                      <td className="sp">
+                        <input className="mini" inputMode="decimal" aria-label="Sonderprovision Betrag" value={f.sonderBetrag ?? ''} placeholder="€" onChange={ev => patch(x.e.sheet, { fields: { sonderBetrag: ev.target.value } })} />
+                        <input className="mini" aria-label="Anlass Sonderprovision" value={f.sonderText ?? ''} placeholder="Anlass" onChange={ev => patch(x.e.sheet, { fields: { sonderText: ev.target.value } })} />
+                      </td>
+                      <td className="r pay"><strong>{eur(x.res.total)}</strong><small>Provision {eur(Math.max(x.res.brutto, R.fix))}{x.res.sl ? ' · SL ' + eur(x.res.sl.betrag) : ''}</small></td>
+                      <td className="acts">
+                        <button className="btn-s" onClick={() => setEdit(x.e.sheet)}>Bearbeiten</button>
+                        <button className="btn-s" onClick={() => onePdf(x.inp)} disabled={!!busy}>PDF</button>
+                      </td>
+                    </tr>
+                    {i.shopleiter && (
+                      <tr className={'slrow' + (x.include ? '' : ' off')}><td></td>
+                        <td colSpan={14}>
+                          <div className="slline">
+                            <strong>Shopleiter-Provision</strong>
+                            <label>Margenziel € <input className="mini" inputMode="decimal" value={i.slZiel} onChange={ev => patchSl(x.e.sheet, { slZiel: ev.target.value })} /></label>
+                            <label>Marge Ist € <input className="mini" inputMode="decimal" value={i.slIst} placeholder="fehlt" onChange={ev => patchSl(x.e.sheet, { slIst: ev.target.value })} /></label>
+                            <label>75–100 % <input className="mini xs" inputMode="decimal" value={i.slRate1} onChange={ev => patchSl(x.e.sheet, { slRate1: ev.target.value })} /> %</label>
+                            <label>über 100 % <input className="mini xs" inputMode="decimal" value={i.slRate2} onChange={ev => patchSl(x.e.sheet, { slRate2: ev.target.value })} /> %</label>
+                            <span>{x.res.sl && x.res.sl.ziel > 0 ? <>Zielerreichung {pf(x.res.sl.quote)} → <b>{eur(x.res.sl.betrag)}</b></> : 'Margenziel eintragen'}</span>
+                          </div>
+                        </td>
+                      </tr>)}
+                    </React.Fragment>);
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="gen">
+            <button className="primary" onClick={generateAll} disabled={!!busy || !chosen.length}>{busy === 'zip' ? 'Erstelle Abrechnungen …' : `Provision generieren (${chosen.length})`}</button>
+            <small>ZIP mit PDF und Excel je Mitarbeiter plus Übersicht.</small>
+            <div className="mailbox">
+              <label className="field inline"><span>Empfänger</span><input type="email" value={meta.mailTo || ''} placeholder="name@firma.de" onChange={e => setMeta(m => ({ ...m, mailTo: e.target.value }))} /></label>
+              <button className="primary alt" onClick={sendMail} disabled={!!busy || !chosen.length}>{busy === 'mail' ? 'Erstelle E-Mail …' : 'Provisionen per E-Mail senden'}</button>
+            </div>
+          </div>
+        </div>
+      ) : data ? <p className="empty">Für {meta.monat || 'diesen Monat'} gibt es keine Mitarbeiterwerte. Wähle einen anderen Monat.</p> : null}
+
+      <Rules R={R} setR={setR} />
+      <button className="ghost" onClick={() => setEdit('__manual')}>Einzelabrechnung ohne Import</button>
+    </div>
+  );
+}
+
+function Header() {
+  return (<header><h1>Provisionsabrechnung</h1><p>Performance-Excel einlesen, prüfen, Provision generieren.</p></header>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+<script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
+</body></html>
