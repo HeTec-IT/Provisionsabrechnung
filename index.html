@@ -155,6 +155,10 @@ table.list{width:100%;border-collapse:collapse;font-size:.85rem}
 .notes:focus{outline:2px solid var(--blue);background:#fff}
 .field.grund{flex-basis:100%}
 .list .tag.note{background:#FFF3D6;color:#7A5300;cursor:help}
+.modes{display:flex;gap:4px;max-width:1440px;margin:12px auto 0;padding:0 16px}
+.modes button{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 18px;font-weight:600;color:var(--muted)}
+.modes button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:middle;margin-left:8px;background:#E8EEFF;padding:3px 10px;border-radius:6px}
 </style>
 </head><body><div id="root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -802,16 +806,415 @@ table.list{width:100%;border-collapse:collapse;font-size:.85rem}
     return hits.length === 1 ? hits[0] : null;
   }
 
-  root.Provi = { parseTelefonie, matchTelefonie, parsePerformance, MONATE, monatsInfo, RULES_VERSION, DEFAULT_RULES, KORR_LABELS, GS, calc, buildXlsx, buildPdf, regularien, eur, pf };
+  root.Provi = { addZusatz, addSonder, cellVal, parseTelefonie, matchTelefonie, parsePerformance, MONATE, monatsInfo, RULES_VERSION, DEFAULT_RULES, KORR_LABELS, GS, calc, buildXlsx, buildPdf, regularien, eur, pf };
   if (typeof module !== 'undefined') module.exports = root.Provi;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
+<script>(function (root) {
+  const B = root.Provi;
+  const { MONATE, cellVal, addZusatz, addSonder } = B;
+  const RULES_VERSION = 2;
+  const DEFAULT_RULES = {
+    margeSockel: 5500, margeAnteil: 0.08,
+    neuSockel: 5, neuBetrag: 20,
+    vvlSockel: 5, vvlBetrag: 5,
+    dpSockel: 3, dpBetrag: 15,
+    tpSockel: 0, tpBetrag: 15,
+    fnVvlSockel: 0, fnVvlBetrag: 10,
+    zubSockel: 50, zubAnteil: 0.5,
+    instBetrag: 10, instVorBetrag: 10,
+    abwBetrag: 10,
+    abzug: 0.25,
+    telSoll: 200, pencilSoll: 0.75, werbSoll: 0.85,
+    fix: 250,
+    zielMarge: 5000, zielNeu: 15, zielVvl: 25, zielDp: 5, zielTp: 2, zielFnVvl: 5, zielZub: 200
+  };
+  const GS = [['tel', 'Korrektur VVL Telefonie + Abfrage'], ['pencil', 'Korrektur Pencil Selling'], ['werb', 'Korrektur Werbeversprechen']];
+
+  const n = v => { const x = parseFloat(String(v ?? '').replace(',', '.')); return isFinite(x) ? x : 0; };
+  const pct = v => n(v) / 100;
+  const r2 = v => Math.round((v + (v >= 0 ? 1e-9 : -1e-9)) * 100) / 100;
+  const pf = v => (Math.round(v * 1000) / 10).toLocaleString('de-DE') + ' %';
+  const eur = v => v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  const strip = s => String(s).replace(/\*\*/g, '');
+  const has = v => !(v === '' || v == null);
+
+  function regularien(R) {
+    return {
+      malus: [
+        `VVL Prozess: Unter ${R.telSoll} VVL Prozess Aktionen (Festnetz Abfrage + Festnetz Telefonie + Mobilfunk Telefonie) = ${pf(R.abzug)} Provisionsabzug. Ziel: Shop hat VVL Prozess Festnetz & Mobilfunk zu 100 % bearbeitet. 1x Festnetzabfrage & 1x Festnetztelefonie bei einem Datensatz = 2 Zähler.`,
+        `Pencil Selling (digital): Pencil-Selling-Quote (sofortige Speicherpflicht in Vedemophone) unter ${pf(R.pencilSoll)} bezogen auf Verkäufe (PO Neu + VVL + DSL) = ${pf(R.abzug)} Provisionsabzug.`,
+        `Werbeversprechen: Liegt das Telefusion-Werbeversprechen unter ${pf(R.werbSoll)} = ${pf(R.abzug)} Provisionsabzug.`,
+        `Provisionsabsicherung: mindestens ${eur(R.fix)} pro Monat.`
+      ],
+      prozess: [
+        'Mitarbeiter befüllt Formblatt und schickt das unterschriebene Formblatt bis zum 5. des Folgemonats an den Vorgesetzten.',
+        'Vorgesetzter meldet bis zum 15. des Monats die unterschriebene Provisionsabrechnung an das Steuerbüro.'
+      ],
+      spielregeln: [
+        'KEIN TOP STOP.',
+        'Echte Stücke/echte Margen werden bezahlt, d. h. Korrekturen nach Feedback Controlling.',
+        'Schieben von einem Mitarbeiter zum anderen Mitarbeiter ist ein „No-Go“ (= Abmahnung/Kündigung).',
+        'Gutscheine/Angebote von Netzbetreibern und Distributionen jeglicher Art sind meldepflichtig beim Vorgesetzten, Geschäftsführer bzw. Vertriebsleiter.',
+        'Die Provisionsvereinbarung/Provisionsabrechnung ist streng vertraulich und ausschließlich für den genannten Mitarbeiter bestimmt.',
+        'Erlangt ein Dritter durch Verschulden des Mitarbeiters Kenntnis von den Provisionsdetails, entstehen Schadensersatzansprüche von mindestens 1.000 Euro.',
+        'Es handelt sich um eine freiwillige Leistung, die ohne Anerkennung einer Rechtspflicht gewährt wird und nach billigem Ermessen unterbleiben kann. Auch bei wiederholter Zahlung wird kein Rechtsanspruch für die Zukunft begründet.',
+        'Die Vereinbarung kann durch den Arbeitgeber aus wirtschaftlichen Gründen jederzeit gekündigt werden.',
+        'Mündliche Nebenabreden zu dieser Abrechnung bestehen nicht. Jede Änderung der Abrechnung muss schriftlich vereinbart werden.',
+        'Die vereinbarte Provision wird im Folgemonat bezahlt.'
+      ]
+    };
+  }
+
+  function calc(inp, R) {
+    const g = k => n(inp[k]);
+    const marge = g('gesamtmarge');
+    const mk = (row, rich, ist, sockel, betrag, o = {}) => {
+      const rel = o.rel != null ? o.rel : Math.max(0, ist - sockel);
+      const aus = r2(o.aus != null ? o.aus : rel * betrag);
+      return { row, rich, label: strip(rich), ist, sockel, betrag, rel, aus, euro: !!o.euro, pctBetrag: !!o.pctBetrag, quote: null, hint: o.hint };
+    };
+    const rows = [
+      mk('marge', `**persönliche Marge** ${pf(R.margeAnteil)} von größer Sockel/Einstieg`, marge, R.margeSockel, R.margeAnteil, { euro: true, pctBetrag: true }),
+      mk('neu', `**Mobilfunk Neuvertrag gesamt** (PO Neu + Congstar) von größer Sockel/Einstieg`, g('po') + g('poC'), R.neuSockel, R.neuBetrag),
+      mk('vvl', `**Mobilfunk VVL gesamt** (VVL + Congstar) von größer Sockel/Einstieg`, g('vvl') + g('vvlC'), R.vvlSockel, R.vvlBetrag),
+      mk('dp', `**T-Com Neu/WW DP** (Festnetz NG + Wechsler Neu) von größer Sockel/Einstieg`, g('dp'), R.dpSockel, R.dpBetrag),
+      mk('tp', `**T-Com Neu/WW TP** (Triple Play + Wechsler Neu) von größer Sockel/Einstieg`, g('tp'), R.tpSockel, R.tpBetrag),
+      mk('fnvvl', `**T-Com VVL** (Festnetz VVL & Upgrade) von größer Sockel/Einstieg`, g('fnVvl'), R.fnVvlSockel, R.fnVvlBetrag),
+      mk('zub', `**Zubehör Marge** größer Sockel/Einstieg, gibt ${pf(R.zubAnteil)} Provision`, g('zubMarge'), R.zubSockel, R.zubAnteil, { euro: true, pctBetrag: true, hint: g('zubStk') ? `${g('zubStk')} Stück · Marge über ${eur(R.zubSockel)} × ${pf(R.zubAnteil)}` : undefined }),
+      mk('inst', `je verkauften **Installationsservice** (Voraussetzung: größer 100 Euro)`, g('inst'), 0, R.instBetrag),
+      mk('instvor', `je **Installation Vorort** vom Mitarbeiter (Voraussetzung: größer 100 Euro)`, g('instVor'), 0, R.instVorBetrag),
+      mk('push', `**Company Sonderpush**${String(inp.pushText || '').trim() ? ': ' + String(inp.pushText).trim() : ''}`, null, null, null, { rel: null, aus: g('pushBetrag') }),
+      mk('abw', `Urlaub/Krankheit`, g('urlaub') + g('krank'), 0, R.abwBetrag)
+    ];
+    const summe = r2(rows.reduce((s, r) => s + r.aus, 0));
+    const qual = [
+      { row: 'tel', label: 'VVL Telefonie + Abfrage', soll: R.telSoll, ist: g('tel'), rated: has(inp.tel), fmt: 'num' },
+      { row: 'pencil', label: 'Pencil Selling', soll: R.pencilSoll, ist: pct(inp.pencil), rated: has(inp.pencil), fmt: 'pct' },
+      { row: 'werb', label: 'Werbeversprechen', soll: R.werbSoll, ist: pct(inp.werb), rated: has(inp.werb), fmt: 'pct' }
+    ].map(x => { const f = x.ist < x.soll ? -R.abzug : 0; return { ...x, faktor: f, betrag: r2(summe * f) }; });
+    const korr = GS.map(([k, label]) => {
+      const qx = qual.find(x => x.row === k); const ded = -qx.betrag; const mode = inp['gs_' + k];
+      let b = 0;
+      if (ded > 0 && mode === 'voll') b = ded;
+      if (ded > 0 && mode === 'teil') b = Math.min(Math.max(n(inp['gsb_' + k]), 0), ded);
+      b = r2(b);
+      const grund = String(inp['gsr_' + k] || '').trim();
+      return { row: 'k_' + k, key: k, label, betrag: b, abzug: ded, grund,
+        note: b ? (mode === 'voll' ? 'Kulanz: volle Gutschrift' : `Kulanz: Teilgutschrift ${eur(b)} von ${eur(ded)}`) + (grund ? ' – ' + grund : '') : '' };
+    });
+    const ksT = String(inp.korrSonstText || '').trim();
+    korr.push({ row: 'k_sonst', key: 'sonst', label: 'Sonstige Korrektur' + (ksT ? ': ' + ksT : ''), betrag: r2(n(inp.korrSonst)), note: '' });
+    let sl = null;
+    if (inp.shopleiter) {
+      const ziel = n(inp.slZiel), ist = n(inp.slIst), r1 = pct(inp.slRate1), r2_ = pct(inp.slRate2), unten = ziel * 0.75;
+      const band = (ist < ziel ? ist : ziel) - unten, ueber = ist > ziel ? ist - ziel : 0;
+      sl = { ziel, ist, quote: ziel > 0 ? ist / ziel : 0, r1, r2: r2_, betrag: ziel > 0 ? r2(Math.max(0, band * r1 + ueber * r2_)) : 0 };
+    }
+    const msy = { betrag: 0 };
+    const brutto = r2(summe + qual.reduce((s, x) => s + x.betrag, 0) + korr.reduce((s, k) => s + k.betrag, 0) + (sl ? sl.betrag : 0));
+    const sonder = { betrag: r2(n(inp.sonderBetrag)), text: String(inp.sonderText || '').trim() };
+    const total = r2(Math.max(brutto, R.fix) + sonder.betrag);
+    const ziele = [
+      ['persönliche Marge (Gesamtmarge)', R.zielMarge, marge, true], ['Mobilfunk Neuvertrag gesamt (PO neu gesamt)', R.zielNeu, g('po') + g('poC')],
+      ['Mobilfunk VVL gesamt', R.zielVvl, g('vvl') + g('vvlC')], ['T-Com Neu/WW DP', R.zielDp, g('dp')], ['T-Com Neu/WW TP', R.zielTp, g('tp')],
+      ['T-Com VVL', R.zielFnVvl, g('fnVvl')], ['Zubehör Marge', R.zielZub, g('zubMarge'), true]
+    ].map(([label, ziel, ist, euro]) => ({ label, ziel, ist, euro: !!euro, quote: ziel > 0 ? ist / ziel : 0 }));
+    return { q: {}, rows, summe, qual, msy, korr, sonder, sl, brutto, total, fixGreift: brutto < R.fix, ziele };
+  }
+
+  // ---------- PDF ----------
+  function buildPdf(jsPDF, inp, R) {
+    const res = calc(inp, R);
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const GRN = [146, 208, 80], YEL = [255, 255, 0], BLU = [180, 198, 231], WHT = [255, 255, 255], LGR = [242, 242, 242], NAVY = [0, 32, 96];
+    const F = 'helvetica', L = 10, Rr = 200, RH = 5;
+    const box = (x1, y1, x2, y2, fill, lw = 0.15) => { doc.setLineWidth(lw); doc.setDrawColor(0); if (fill) { doc.setFillColor(...fill); doc.rect(x1, y1, x2 - x1, y2 - y1, 'FD'); } else doc.rect(x1, y1, x2 - x1, y2 - y1, 'S'); };
+    const txt = (s, x, y, o = {}) => { doc.setFont(F, o.bold ? 'bold' : 'normal'); doc.setFontSize(o.size || 7.5); doc.setTextColor(...(o.color || [0, 0, 0])); doc.text(String(s), x, y, { align: o.align || 'left' }); };
+    const rich = (s, x, y, maxW, size = 7.5, color = [0, 0, 0]) => {
+      const parts = String(s).split('**');
+      const width = sz => parts.reduce((w, t, i) => { doc.setFont(F, i % 2 ? 'bold' : 'normal'); doc.setFontSize(sz); return w + doc.getTextWidth(t); }, 0);
+      let sz = size; while (width(sz) > maxW && sz > 4.8) sz -= 0.25;
+      let cx = x; parts.forEach((t, i) => { if (!t) return; doc.setFont(F, i % 2 ? 'bold' : 'normal'); doc.setFontSize(sz); doc.setTextColor(...color); const sp0 = sz * 0.278 * 25.4 / 72 * 1.8; doc.text(t.trimStart(), cx + (t.length - t.trimStart().length) * sp0, y); const sp = sz * 0.278 * 25.4 / 72 * 1.8; const lead = t.length - t.trimStart().length, trail = t.length - t.trimEnd().length; cx += doc.getTextWidth(t.trim()) + (lead + trail) * sp; if (lead) {} });
+    };
+    const de = (v, d = 2) => v.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const st = v => (Math.round(v * 100) / 100).toLocaleString('de-DE');
+    const acc = (v, x2, y, o = {}) => { const r = Math.round(v * 100) / 100; txt(r === 0 ? '-   €' : (r < 0 ? '- ' : '') + de(Math.abs(r)) + ' €', x2 - 1.2, y, { bold: true, align: 'right', size: o.size || 7.5 }); };
+    const X = [L, 118, 140, 160, 177, Rr]; // Zielpunkt | Erreicht | Sockel | Einzelbetrag | Auszahlung
+
+    // Kopf (grün)
+    box(L, 12, Rr, 31, GRN, 0.3);
+    txt('Provisionsabrechnung Fachverkäufer', L + 1.5, 18.5, { bold: true, size: 14 });
+    txt('Vorname/Name:', L + 1.5, 23, { size: 6.5 }); txt('Monat:', Rr - 2, 23, { size: 6.5, align: 'right' });
+    txt(inp.vollerName || inp.name || '', L + 1.5, 28.5, { bold: true, size: 12 }); txt(inp.monat || '', Rr - 2, 28.5, { bold: true, size: 12, align: 'right' });
+
+    // Zielpunkte (Info)
+    let y = 37;
+    txt('Zielpunkte' + (inp.standort ? ' ' + inp.standort : ''), L, y, { bold: true, size: 10 });
+    y += 1.5;
+    const ZX = [L, 140, 160, 180, Rr];
+    box(ZX[0], y, ZX[1], y + 4.2, LGR); box(ZX[1], y, ZX[2], y + 4.2, LGR); box(ZX[2], y, ZX[3], y + 4.2, BLU); box(ZX[3], y, ZX[4], y + 4.2, LGR);
+    txt('Ziele', (ZX[1] + ZX[2]) / 2, y + 3, { bold: true, size: 6.5, align: 'center' }); txt('IST', (ZX[2] + ZX[3]) / 2, y + 3, { bold: true, size: 6.5, align: 'center' }); txt('Erreichung', (ZX[3] + ZX[4]) / 2, y + 3, { bold: true, size: 6.5, align: 'center' });
+    y += 4.2;
+    res.ziele.forEach(z => {
+      box(ZX[0], y, ZX[1], y + 3.9); box(ZX[1], y, ZX[2], y + 3.9); box(ZX[2], y, ZX[3], y + 3.9, BLU); box(ZX[3], y, ZX[4], y + 3.9);
+      txt(z.label, L + 0.8, y + 2.8, { size: 6.5 });
+      txt(z.euro ? de(z.ziel) + ' €' : st(z.ziel), ZX[2] - 1, y + 2.8, { size: 6.5, align: 'right' });
+      txt(z.euro ? de(z.ist) + ' €' : st(z.ist), ZX[3] - 1, y + 2.8, { size: 6.5, align: 'right' });
+      txt(z.ziel > 0 ? Math.round(z.quote * 100) + ' %' : '–', ZX[4] - 1, y + 2.8, { size: 6.5, align: 'right', bold: z.ziel > 0 && z.quote >= 1, color: z.ziel > 0 && z.quote >= 1 ? [14, 122, 75] : [0, 0, 0] });
+      y += 3.9;
+    });
+
+    // Berechnung Provisionen (grün)
+    y += 4;
+    txt('Berechnung Provisionen:', L, y, { bold: true, size: 10 }); txt('(zielrelevant: gesamte Performance des Mitarbeiters, egal in welchem Shop)', L + 45, y, { size: 6.5 });
+    y += 1.5;
+    const hh = 8;
+    ['Zielpunkt/Aktionen', 'Erreichte Stücke/Margen', 'Sockel/Einstieg', 'Einzelbetrag', 'Auszahlung'].forEach((h, i) => {
+      box(X[i], y, X[i + 1], y + hh, GRN);
+      const ls = doc.splitTextToSize(h, X[i + 1] - X[i] - 2);
+      ls.forEach((l, k) => txt(l, i ? (X[i] + X[i + 1]) / 2 : X[i] + 0.8, y + 3.2 + k * 2.8, { bold: true, size: 6.5, align: i ? 'center' : 'left' }));
+    });
+    y += hh;
+    res.rows.forEach(r => {
+      const b = y + RH - 1.4;
+      box(X[0], y, X[1], y + RH, GRN); rich(r.rich, X[0] + 0.8, b, X[1] - X[0] - 1.6, 7.2);
+      box(X[1], y, X[2], y + RH, GRN); box(X[2], y, X[3], y + RH, GRN); box(X[3], y, X[4], y + RH, GRN); box(X[4], y, X[5], y + RH, WHT);
+      if (r.row !== 'push') {
+        txt(r.euro ? de(r.ist) + ' €' : st(r.ist), X[1] + 1, b, { size: 7 });
+        txt(r.euro ? de(r.sockel) + ' €' : st(r.sockel), X[2] + 1, b, { size: 7 });
+        txt(r.pctBetrag ? Math.round(r.betrag * 100) + '%' : de(r.betrag) + ' €', X[4] - 1, b, { size: 7, align: 'right' });
+      }
+      acc(r.aus, X[5], b);
+      y += RH;
+    });
+    box(X[0], y, X[4], y + 6.5, GRN); box(X[4], y, X[5], y + 6.5, GRN);
+    txt('potentieller Auszahlungsbetrag', X[0] + 0.8, y + 4.8, { bold: true, size: 10 });
+    acc(res.summe, X[5], y + 4.8, { size: 9.5 });
+    doc.setLineWidth(0.5); doc.line(X[0], y + 6.5, X[5], y + 6.5);
+    y += 6.5;
+    if (res.sl) {
+      box(X[0], y, X[4], y + RH, YEL); rich(`**Shopleiter-Provision** Marge: Ziel ${de(res.sl.ziel)} € · Ist ${de(res.sl.ist)} € · ${pf(res.sl.quote)}`, X[0] + 0.8, y + RH - 1.4, X[4] - X[0] - 2);
+      box(X[4], y, X[5], y + RH, WHT); acc(res.sl.betrag, X[5], y + RH - 1.4); y += RH;
+    }
+
+    // Qualitätssicherung (gelb)
+    y += 3;
+    const QX = [L, 118, 140, 160, 177, Rr];
+    box(QX[0], y, QX[1], y + 6, YEL); txt('Qualitätssicherung', QX[0] + 0.8, y + 4.3, { bold: true, size: 10 });
+    box(QX[1], y, QX[2], y + 6, YEL); txt('Soll', (QX[1] + QX[2]) / 2, y + 4.2, { bold: true, size: 8, align: 'center' });
+    box(QX[2], y, QX[3], y + 6, YEL); txt('Ist', (QX[2] + QX[3]) / 2, y + 4.2, { bold: true, size: 8, align: 'center' });
+    box(QX[3], y, QX[4], y + 6, YEL); txt('Malus', (QX[3] + QX[4]) / 2, y + 4.2, { bold: true, size: 8, align: 'center' });
+    box(QX[4], y, QX[5], y + 6, YEL);
+    y += 6;
+    const qv = (x, v) => x.fmt === 'pct' ? Math.round(v * 100) + '%' : x.fmt === 'eur' ? de(v, 0) + ' €' : st(v);
+    res.qual.forEach(x => {
+      const b = y + RH - 1.4;
+      [0, 1, 2, 3].forEach(i => box(QX[i], y, QX[i + 1], y + RH, YEL)); box(QX[4], y, QX[5], y + RH, WHT);
+      rich(x.label, QX[0] + 0.8, b, QX[1] - QX[0] - 1.6, 7.2);
+      txt(qv(x, x.soll), (QX[1] + QX[2]) / 2, b, { size: 7, align: 'center' });
+      const bad = x.faktor < 0;
+      txt(x.rated ? qv(x, x.ist) : 'fehlt', (QX[2] + QX[3]) / 2, b, { size: 7, align: 'center', color: bad ? [194, 54, 43] : [0, 0, 0], bold: bad });
+      txt(Math.round(x.faktor * 100) + '%', QX[4] - 1, b, { size: 7, align: 'right' });
+      acc(x.betrag, QX[5], b);
+      y += RH;
+    });
+    res.korr.forEach(k => {
+      if (!k.betrag && k.key !== 'sonst') return;
+      if (!k.betrag) return;
+      const b = y + RH - 1.4;
+      box(QX[0], y, QX[4], y + RH, YEL); rich(k.label + (k.note ? '  **' + k.note + '**' : ''), QX[0] + 0.8, b, QX[4] - QX[0] - 1.6, 7.2);
+      box(QX[4], y, QX[5], y + RH, WHT); acc(k.betrag, QX[5], b); y += RH;
+    });
+    if (res.sonder.betrag) {
+      const b = y + RH - 1.4;
+      box(QX[0], y, QX[4], y + RH, YEL); rich('**Sonderprovision**' + (res.sonder.text ? ': ' + res.sonder.text : ''), QX[0] + 0.8, b, QX[4] - QX[0] - 1.6, 7.2);
+      box(QX[4], y, QX[5], y + RH, WHT); acc(res.sonder.betrag, QX[5], b); y += RH;
+    }
+    txt(`Provisionsabsicherung ${de(R.fix, 0)},- €`, L, y + 3.5, { size: 6.5 });
+
+    // Auszahlungsbetrag (grün)
+    y += 6;
+    const gy = y, gh = 19;
+    box(L, gy, Rr, gy + gh, GRN, 0.3);
+    doc.setLineWidth(0.15); doc.line(L, gy + gh - 3.5, Rr, gy + gh - 3.5);
+    txt('Auszahlungsbetrag', L + 1.5, gy + 6, { bold: true, size: 12 });
+    txt(inp.monat || '', 150, gy + 6, { bold: true, size: 10 });
+    doc.setLineWidth(0.25); doc.line(150, gy + 6.7, 150 + doc.getTextWidth(inp.monat || ''), gy + 6.7);
+    const totS = de(res.total) + ' €';
+    txt(totS, Rr - 2, gy + 6, { bold: true, size: 12, align: 'right' });
+    doc.setFont(F, 'bold'); doc.setFontSize(12);
+    const ux = Rr - 3 - doc.getTextWidth(totS);
+    doc.line(ux, gy + 7, Rr - 2, gy + 7); doc.line(ux, gy + 7.6, Rr - 2, gy + 7.6);
+    if (res.fixGreift) txt(`Provisionsabsicherung greift (berechnet ${eur(res.brutto)})`, Rr - 2, gy + 10.5, { size: 6, align: 'right' });
+    txt('Datum & Unterschrift Mitarbeiter', L + 1.5, gy + gh - 1, { size: 6.5 });
+    txt('Datum & Unterschrift Vorgesetzter', 110, gy + gh - 1, { size: 6.5 });
+
+    // Seite 2: Regularien
+    const reg = regularien(R);
+    doc.addPage();
+    let ry = 18;
+    const section = (title, lines, boldFirst) => {
+      txt(title, L, ry, { bold: true, size: 12, color: NAVY }); doc.setDrawColor(...NAVY); doc.setLineWidth(0.3); doc.line(L, ry + 1, L + doc.getTextWidth(title), ry + 1); doc.setDrawColor(0);
+      ry += 6;
+      lines.forEach(t => {
+        doc.setFont(F, 'normal'); doc.setFontSize(8.5); doc.setTextColor(...NAVY);
+        const ls = doc.splitTextToSize('• ' + t, Rr - L - 2);
+        doc.text(ls, L + 1, ry); ry += ls.length * 3.8 + 1.2;
+      });
+      ry += 4;
+    };
+    section('Qualitätssicherung durch Malusregelungen auf den potentiellen Auszahlungsbetrag', reg.malus);
+    section('Prozess Abrechnung', reg.prozess);
+    section('Spielregeln Provisionsvereinbarung', reg.spielregeln);
+    txt(`Bestimmt für: ${inp.vollerName || inp.name || ''}`, L, ry + 2, { size: 8, color: NAVY, bold: true });
+
+    addZusatz(doc, inp, res);
+    if (res.sonder.betrag) addSonder(doc, inp, res);
+    return doc;
+  }
+
+  // ---------- Excel ----------
+  async function buildXlsx(ExcelJS, _u, inp, R) {
+    const res = calc(inp, R);
+    const wb = new ExcelJS.Workbook(); wb.calcProperties = { fullCalcOnLoad: true };
+    const ws = wb.addWorksheet('Provisionsabrechnung', { pageSetup: { paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 }, views: [{ showGridLines: false }] });
+    ws.columns = [{ width: 80 }, { width: 16 }, { width: 16 }, { width: 14 }, { width: 18 }];
+    const thin = { style: 'thin', color: { argb: 'FF000000' } };
+    const FILL = { g: 'FF92D050', y: 'FFFFFF00', b: 'FFB4C6E7', w: 'FFFFFFFF', l: 'FFF2F2F2' };
+    const EUR = '#,##0.00 "€"', ACC = '_-* #,##0.00 "€"_-;-* #,##0.00 "€"_-;_-* "-"?? "€"_-;_-@_-';
+    const cell = (a, v, o = {}) => { const c = ws.getCell(a); if (v !== undefined) c.value = v; c.font = { name: 'Calibri', size: o.size || 11, bold: !!o.bold, color: { argb: o.color || 'FF000000' } };
+      if (o.fill) { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: FILL[o.fill] } }; if (o.border !== false) c.border = { top: thin, left: thin, bottom: thin, right: thin }; }
+      if (o.fmt) c.numFmt = o.fmt; c.alignment = { vertical: 'middle', horizontal: o.h, wrapText: !!o.wrap }; return c; };
+    const fx = (formula, result) => ({ formula, result });
+    'ABCDE'.split('').forEach(c => { cell(c + '1', undefined, { fill: 'g', border: false }); cell(c + '2', undefined, { fill: 'g', border: false }); cell(c + '3', undefined, { fill: 'g', border: false }); });
+    cell('A1', 'Provisionsabrechnung Fachverkäufer', { fill: 'g', bold: true, size: 18, border: false });
+    cell('A2', 'Vorname/Name:', { fill: 'g', size: 9, border: false }); cell('E2', 'Monat:', { fill: 'g', size: 9, border: false, h: 'right' });
+    cell('A3', inp.vollerName || inp.name || '', { fill: 'g', bold: true, size: 16, border: false }); cell('E3', inp.monat || '', { fill: 'g', bold: true, size: 16, border: false, h: 'right' });
+    let r = 5;
+    cell('A' + r, 'Zielpunkte' + (inp.standort ? ' ' + inp.standort : ''), { bold: true, size: 14 }); cell('B' + r, 'Ziele', { bold: true, fill: 'l', h: 'center' }); cell('C' + r, 'IST', { bold: true, fill: 'b', h: 'center' }); cell('D' + r, 'Erreichung', { bold: true, fill: 'l', h: 'center' }); r++;
+    res.ziele.forEach(z => { cell('A' + r, z.label, { fill: 'w' }); cell('B' + r, z.ziel, { fill: 'w', fmt: z.euro ? EUR : '0' }); cell('C' + r, z.ist, { fill: 'b', fmt: z.euro ? EUR : '0' }); cell('D' + r, fx(`IF(B${r}>0,C${r}/B${r},"")`, z.ziel > 0 ? z.quote : ''), { fill: 'w', fmt: '0%' }); r++; });
+    r++;
+    cell('A' + r, 'Berechnung Provisionen: (zielrelevant gesamte Performance Mitarbeiter egal in welchem Shop)', { bold: true, size: 12 }); r++;
+    ['Zielpunkt/Aktionen', 'Erreichte Stücke/Margen', 'Sockel / Einstieg', 'Einzelbetrag', 'Auszahlung'].forEach((h, i) => cell(String.fromCharCode(65 + i) + r, h, { bold: true, fill: 'g', wrap: true, h: i ? 'center' : 'left' }));
+    ws.getRow(r).height = 32; r++;
+    const first = r;
+    res.rows.forEach(x => {
+      cell('A' + r, strip(x.rich), { fill: 'g' });
+      if (x.row === 'push') { ['B', 'C', 'D'].forEach(c => cell(c + r, null, { fill: 'g' })); cell('E' + r, x.aus || 0, { fill: 'w', bold: true, fmt: ACC }); }
+      else {
+        cell('B' + r, x.ist, { fill: 'g', fmt: x.euro ? EUR : '0' }); cell('C' + r, x.sockel, { fill: 'g', fmt: x.euro ? EUR : '0' }); cell('D' + r, x.betrag, { fill: 'g', fmt: x.pctBetrag ? '0%' : EUR });
+        const formula = `MAX(0,B${r}-C${r})*D${r}`;
+        cell('E' + r, fx(formula, x.aus), { fill: 'w', bold: true, fmt: ACC });
+      }
+      r++;
+    });
+    const rSum = r;
+    'ABCD'.split('').forEach(c => cell(c + r, null, { fill: 'g' }));
+    cell('A' + r, 'potentieller Auszahlungsbetrag', { fill: 'g', bold: true, size: 14 }); cell('E' + r, fx(`SUM(E${first}:E${r - 1})`, res.summe), { fill: 'g', bold: true, size: 13, fmt: ACC }); r++;
+    const add = [];
+    if (res.sl) { cell('A' + r, `Shopleiter-Provision Marge: Ziel ${eur(res.sl.ziel)} · Ist ${eur(res.sl.ist)} · ${pf(res.sl.quote)}`, { fill: 'y', bold: true }); 'BCD'.split('').forEach(c => cell(c + r, null, { fill: 'y' })); cell('E' + r, res.sl.betrag, { fill: 'w', bold: true, fmt: ACC }); add.push('E' + r); r++; }
+    r++;
+    cell('A' + r, 'Qualitätssicherung', { fill: 'y', bold: true, size: 14 }); cell('B' + r, 'Soll', { fill: 'y', bold: true, h: 'center' }); cell('C' + r, 'Ist', { fill: 'y', bold: true, h: 'center' }); cell('D' + r, 'Malus', { fill: 'y', bold: true, h: 'center' }); cell('E' + r, null, { fill: 'y' }); r++;
+    res.qual.forEach(x => {
+      const fmt = x.fmt === 'pct' ? '0%' : x.fmt === 'eur' ? EUR : '0';
+      cell('A' + r, x.label, { fill: 'y' }); cell('B' + r, x.soll, { fill: 'y', fmt, h: 'center' }); cell('C' + r, x.rated ? x.ist : null, { fill: 'y', fmt, h: 'center' });
+      const f = `IF(N(C${r})<B${r},-${R.abzug},0)`;
+      cell('D' + r, fx(f, x.faktor), { fill: 'y', fmt: '0%', h: 'right' }); cell('E' + r, fx(`$E$${rSum}*D${r}`, x.betrag), { fill: 'w', bold: true, fmt: ACC }); add.push('E' + r); r++;
+    });
+    res.korr.filter(k => k.betrag).forEach(k => { cell('A' + r, k.label + (k.note ? ' – ' + k.note : ''), { fill: 'y', bold: true }); 'BCD'.split('').forEach(c => cell(c + r, null, { fill: 'y' })); cell('E' + r, k.betrag, { fill: 'w', bold: true, fmt: ACC }); add.push('E' + r); r++; });
+    let sc = null;
+    if (res.sonder.betrag) { cell('A' + r, 'Sonderprovision' + (res.sonder.text ? ': ' + res.sonder.text : ''), { fill: 'y', bold: true }); 'BCD'.split('').forEach(c => cell(c + r, null, { fill: 'y' })); cell('E' + r, res.sonder.betrag, { fill: 'w', bold: true, fmt: ACC }); sc = 'E' + r; r++; }
+    cell('A' + r, `Provisionsabsicherung ${R.fix},- €`, { size: 9 }); r += 2;
+    'ABCDE'.split('').forEach(c => { cell(c + r, undefined, { fill: 'g', border: false }); cell(c + (r + 1), undefined, { fill: 'g', border: false }); cell(c + (r + 2), undefined, { fill: 'g', border: false }); });
+    cell('A' + r, 'Auszahlungsbetrag', { fill: 'g', bold: true, size: 16, border: false }); cell('D' + r, inp.monat || '', { fill: 'g', bold: true, size: 13, border: false, h: 'right' });
+    const expr = `E${rSum}+${add.join('+') || '0'}`;
+    const tc = cell('E' + r, fx(sc ? `MAX(${expr},${R.fix})+${sc}` : `MAX(${expr},${R.fix})`, res.total), { fill: 'g', bold: true, size: 16, border: false, fmt: EUR });
+    tc.font = { ...tc.font, underline: 'doubleAccounting' };
+    cell('A' + (r + 2), 'Datum & Unterschrift Mitarbeiter', { fill: 'g', size: 9, border: false }); cell('C' + (r + 2), 'Datum & Unterschrift Vorgesetzter', { fill: 'g', size: 9, border: false });
+    r += 4;
+    const reg = regularien(R);
+    [['Qualitätssicherung durch Malusregelungen', reg.malus], ['Prozess Abrechnung', reg.prozess], ['Spielregeln Provisionsvereinbarung', reg.spielregeln]].forEach(([t, ls]) => {
+      cell('A' + r, t, { bold: true, size: 12, color: 'FF002060' }); r++;
+      ls.forEach(l => { ws.mergeCells(`A${r}:E${r}`); cell('A' + r, l, { size: 9, color: 'FF002060', wrap: true }); ws.getRow(r).height = l.length > 140 ? 26 : 14; r++; });
+      r++;
+    });
+    return { buffer: await wb.xlsx.writeBuffer(), res };
+  }
+
+  // ---------- Import ----------
+  function parsePerformance(wb) {
+    const norm = s => String(s || '').toLowerCase().replace(/[´'"\s.%]/g, '');
+    const employees = []; const monthsWithData = new Set();
+    wb.worksheets.forEach(ws => {
+      if (ws.state && ws.state !== 'visible') return;
+      let hdr = 0;
+      for (let r = 1; r <= 6 && !hdr; r++) for (let c = 1; c <= 40; c++) if (norm(cellVal(ws.getCell(r, c))) === 'poneu') { hdr = r; break; }
+      if (!hdr) return;
+      const H = {}; const seen = {};
+      for (let c = 1; c <= 60; c++) {
+        let k = norm(cellVal(ws.getCell(hdr, c)));
+        if (!k && hdr > 1) k = norm(cellVal(ws.getCell(hdr - 1, c)));
+        if (!k) continue;
+        seen[k] = (seen[k] || 0) + 1; H[k + '#' + seen[k]] = c;
+      }
+      const col = (k, i = 1) => H[k + '#' + i];
+      const findKey = pre => { const k = Object.keys(H).find(x => x.startsWith(pre)); return k ? H[k] : null; };
+      const C = {
+        po: col('poneu'), poC: col('poneucongstar'), vvl: col('vvl'), vvlC: col('vvlcongstar'),
+        dp: findKey('t-comneu/wwdp'), tp: findKey('t-comneu/wwtp'), fnVvl: col('t-comvvl'),
+        vfNeu: col('vodafone/kabelneu'), vfVvl: col('vodafone/kabelvvl'), rest: col('restneu'),
+        handys: findKey('handy'), ks: col('ks'), zubStk: col('stück'), zubMarge: col('marge'),
+        werb: col('werbeversprechen'), pencil: col('pencilselling'),
+        telNicht: col('nichterreicht'), telErr: col('erreicht'), telAbfrage: col('abfrage'), tel: col('gesamt'),
+        urlaub: col('urlaub'), krank: col('krank'), interessenten: col('interessentenstk'), gesamtmarge: col('gesamtmarge')
+      };
+      const fullName = String(cellVal(ws.getCell(1, 1)) || ws.name).trim();
+      const rows = {};
+      for (let r = hdr + 1; r <= Math.min(ws.rowCount, hdr + 40); r++) {
+        const m = String(cellVal(ws.getCell(r, 1)) || '').trim();
+        const mi = MONATE.findIndex(x => x.toLowerCase() === m.toLowerCase());
+        if (mi < 0) continue;
+        const d = {}; Object.keys(C).forEach(k => d[k] = C[k] ? cellVal(ws.getCell(r, C[k])) : null);
+        const num = v => typeof v === 'number' ? v : '';
+        const pc = v => typeof v === 'number' ? Math.round(v * 1000) / 10 : '';
+        const sales = ['po', 'poC', 'vvl', 'vvlC', 'dp', 'tp', 'fnVvl', 'handys', 'gesamtmarge'].some(k => typeof d[k] === 'number' && d[k] > 0);
+        const any = sales || ['urlaub', 'krank'].some(k => typeof d[k] === 'number' && d[k] > 0);
+        if (any) monthsWithData.add(mi);
+        const warn = [];
+        const nm = fullName.toLowerCase(), sh = ws.name.toLowerCase().split(/\s+/)[0];
+        if (!nm.includes(sh)) warn.push(`Name in A1 („${fullName}“) passt nicht zum Blatt „${ws.name}“`);
+        if (!C.urlaub || !C.krank) warn.push('Spalte Urlaub/Krank fehlt');
+        const telEmpty = d.telNicht == null && d.telErr == null && d.telAbfrage == null;
+        rows[MONATE[mi]] = { active: any, warn, inp: {
+          po: num(d.po), poC: num(d.poC), vvl: num(d.vvl), vvlC: num(d.vvlC), dp: num(d.dp), tp: num(d.tp), fnVvl: num(d.fnVvl),
+          vfNeu: num(d.vfNeu), vfVvl: num(d.vfVvl), handys: num(d.handys), ks: num(d.ks), zubStk: num(d.zubStk), zubMarge: num(d.zubMarge),
+          werb: typeof d.werb === 'number' && d.werb >= 0 && d.werb <= 1.5 ? pc(d.werb) : '', pencil: typeof d.pencil === 'number' && d.pencil >= 0 && d.pencil <= 1.5 ? pc(d.pencil) : '',
+          tel: telEmpty ? '' : num(d.tel), urlaub: num(d.urlaub), krank: num(d.krank), interessenten: num(d.interessenten), gesamtmarge: num(d.gesamtmarge),
+          inst: '', instVor: '', tvq: '', shopMarge: ''
+        } };
+      }
+      // Platzhalter, falls der Name in A1 falsch ist: Blattname nutzen
+      const nameOk = fullName.toLowerCase().includes(ws.name.toLowerCase().split(/\s+/)[0]);
+      employees.push({ sheet: ws.name, fullName: nameOk ? fullName : ws.name, rows });
+    });
+    return { employees, months: [...monthsWithData].sort((a, b) => a - b).map(i => MONATE[i]) };
+  }
+
+  root.ProviFH = { RULES_VERSION, DEFAULT_RULES, GS, calc, buildPdf, buildXlsx, parsePerformance, regularien };
+  if (typeof module !== 'undefined') module.exports = root.ProviFH;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
 <script type="text/babel" data-presets="react">const { useState, useMemo, useEffect, useRef } = React;
-const GS_LABELS = { werb: 'Werbeversprechen', pencil: 'Pencil Selling', marketing: 'Marketing / Telefonie', tv: 'o2 TV', os: 'Online-Schutz' };
-const { parseTelefonie, matchTelefonie, parsePerformance, MONATE, RULES_VERSION, DEFAULT_RULES, KORR_LABELS, calc, buildXlsx, buildPdf, eur, pf } = window.Provi;
+const { parseTelefonie, matchTelefonie, MONATE, eur, pf } = window.Provi;
+let CUR = null; // aktives Profil (o2 / Fachhandel)
+const calc = (...x) => CUR.core.calc(...x);
+const buildXlsx = (...x) => CUR.core.buildXlsx(...x);
+const buildPdf = (...x) => CUR.core.buildPdf(...x);
+const pk = k => CUR.prefix + '_' + k;
 
 const heute = () => new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-const BLANK = { po: '', kombi: '', kombiData: '', vvl: '', dsl: '', dslVvl: '', schutzOnline: '', tv: '', handys: '', ks: '', zubStk: '', zubMarge: '', werb: '', pencil: '', pencilQual: '', urlaub: '', krank: '', fachhandel: '', marketing: '', msy: '', arbeitstage: '25', arbeitstageVon: '25' };
+const O2_BLANK = { po: '', kombi: '', kombiData: '', vvl: '', dsl: '', dslVvl: '', schutzOnline: '', tv: '', handys: '', ks: '', zubStk: '', zubMarge: '', werb: '', pencil: '', pencilQual: '', urlaub: '', krank: '', fachhandel: '', marketing: '', msy: '', arbeitstage: '25', arbeitstageVon: '25' };
 const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 const safe = s => String(s || '').replace(/[^\wäöüÄÖÜß-]+/g, '_');
@@ -820,18 +1223,19 @@ function b64ToBuf(b) { const s = atob(b); const a = new Uint8Array(s.length); fo
 function download(blob, name) { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); }
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const num = v => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString('de-DE');
+const fmtQ = (x, v) => x.fmt === 'pct' ? pf(v) : x.fmt === 'eur' ? eur(v) : num(v);
 const show = v => v === '' || v == null ? '–' : num(v);
 
-const SL_DEFAULTS = { Hitzler: { on: true, r1: '5', r2: '10', ziel: '12500' }, Enenkel: { on: true, r1: '2.5', r2: '5', ziel: '21000' } };
+const O2_SL_DEFAULTS = { Hitzler: { on: true, r1: '5', r2: '10', ziel: '12500' }, Enenkel: { on: true, r1: '2.5', r2: '5', ziel: '21000' } };
 const SL_KEYS = ['shopleiter', 'slRate1', 'slRate2', 'slZiel', 'slIst'];
 
-const GROUPS = [
+const O2_GROUPS = [
   { title: 'Mobilfunk', fields: [['po', 'Postpaid „normal“'], ['kombi', 'Kombi'], ['kombiData', 'Kombi Data'], ['vvl', 'VVL'], ['handys', 'Handys'], ['ks', 'Komplettschutz']] },
   { title: 'DSL, TV & Zubehör', fields: [['dsl', 'DSL Neu'], ['dslVvl', 'DSL VVL'], ['tv', 'o2 TV'], ['schutzOnline', 'Online-Schutz'], ['zubStk', 'Zubehör Stück'], ['zubMarge', 'Zubehör Marge €'], ['fachhandel', 'Fachhandel Aktivierungen']] },
   { title: 'Qualität (leer = Abzug)', fields: [['werb', 'Werbeversprechen (DNE) %'], ['pencil', 'Pencil Selling %'], ['pencilQual', 'Pencil Qualität %'], ['marketing', 'Marketing / Telefonie'], ['msy', 'MSY %']] },
   { title: 'Abwesenheit & Arbeitstage', fields: [['urlaub', 'Urlaub (Tage)'], ['krank', 'Krank/Schulung (Tage)'], ['arbeitstage', 'Arbeitstage'], ['arbeitstageVon', 'von Arbeitstagen']] }
 ];
-const RULE_GROUPS = [
+const O2_RULE_GROUPS = [
   ['Postpaid', [['ppSchwelle', 'provisioniert ab Stück über', 1], ['ppBetrag', '€ je Vertrag', 1]]],
   ['Komplettschutz', [['ksAb', 'ab Stück', 1], ['ksBetrag', '€ je Stück', 1]]],
   ['DSL', [['dslSchwelle', 'provisioniert ab Stück über', 1], ['dslSoll', 'DSL-Quote Soll %', 100], ['dslBetragNiedrig', '€ bei Quote bis Soll', 1], ['dslBetragHoch', '€ bei Quote über Soll', 1], ['dslVvlBetrag', 'DSL VVL € je Stück', 1]]],
@@ -840,6 +1244,72 @@ const RULE_GROUPS = [
   ['Qualitätsziele', [['abzug', 'Abzug je verfehltem Ziel %', 100], ['werbSoll', 'Werbeversprechen Soll %', 100], ['pencilSoll', 'Pencil Selling Soll %', 100], ['marketingSoll', 'Marketing/Telefonie Soll', 1], ['tvSoll', 'o2 TV Soll (Vollzeit)', 1], ['osSoll', 'Online-Schutz Soll (Vollzeit)', 1], ['tvSollTZ', 'o2 TV Soll (Azubi/Teilzeit)', 1], ['osSollTZ', 'Online-Schutz Soll (Azubi/Teilzeit)', 1]]],
   ['Boni & Fix', [['msySoll', 'MSY Soll %', 100], ['msyBonus', 'MSY Bonus €', 1], ['fix', 'Fixprovision €', 1]]]
 ];
+
+
+const pcS = v => v === '' || v == null ? '–' : num(v) + '%';
+const FH_BLANK = { po: '', poC: '', vvl: '', vvlC: '', dp: '', tp: '', fnVvl: '', vfNeu: '', vfVvl: '', handys: '', ks: '', zubStk: '', zubMarge: '', gesamtmarge: '', inst: '', instVor: '', tel: '', pencil: '', werb: '', interessenten: '', tvq: '', shopMarge: '', urlaub: '', krank: '', standort: '' };
+const PROFILES = {
+  o2: {
+    id: 'o2', prefix: 'provi', title: 'o2 Shops', core: window.Provi, BLANK: O2_BLANK, GROUPS: O2_GROUPS, RULE_GROUPS: O2_RULE_GROUPS, SL_DEFAULTS: O2_SL_DEFAULTS,
+    GS_LABELS: { werb: 'Werbeversprechen', pencil: 'Pencil Selling', marketing: 'Telefonie', tv: 'o2 TV', os: 'Online-Schutz' },
+    features: { teilzeit: true }, pushLabel: 'Push-Provision', telField: 'marketing',
+    chips: (res, R) => [[`DSL ${pf(res.q.dsl)}`, res.q.dsl > R.dslSoll ? 'ok' : 'no'], [`KS ${pf(res.q.ks)}`]],
+    kpis: [
+      { h: 'PO', v: (i, r) => show(r.q.poGes) }, { h: 'VVL', v: i => show(i.vvl) }, { h: 'DSL', v: i => show(i.dsl) }, { h: 'KS', v: i => show(i.ks) },
+      { h: 'TV', q: 'tv', v: i => show(i.tv) }, { h: 'OS', q: 'os', v: i => show(i.schutzOnline) }, { h: 'DNE', q: 'werb', v: i => pcS(i.werb) },
+      { h: 'Pencil', q: 'pencil', v: i => pcS(i.pencil) }, { h: 'Tel.', q: 'marketing', v: i => show(i.marketing) }, { h: 'Abw.', v: i => num((Number(i.urlaub) || 0) + (Number(i.krank) || 0)) }
+    ],
+    todo: (inp, row, data) => {
+      const t = [];
+      if (inp.werb === '') t.push({ k: 'werb', t: row.warn.find(w => w.startsWith('Werbeversprechen ungültig')) || 'Werbeversprechen fehlt' });
+      if (inp.pencil === '') t.push({ k: 'pencil', t: 'Pencil Selling fehlt' });
+      if (inp.marketing === '') t.push({ k: 'marketing', t: data.telefonie ? 'Telefonie: Name nicht gefunden' : 'Telefonie fehlt' });
+      if (row.warn.includes('Spalte Urlaub/Krank fehlt') && inp.urlaub === '') t.push({ t: 'Urlaub/Krank fehlt' });
+      return t;
+    }
+  },
+  fh: {
+    id: 'fh', prefix: 'provifh', title: 'Fachhandel', core: window.ProviFH, BLANK: FH_BLANK, SL_DEFAULTS: {},
+    GS_LABELS: { tel: 'Telefonie + Abfrage', pencil: 'Pencil Selling', werb: 'Werbeversprechen' },
+    features: { teilzeit: false }, pushLabel: 'Company Sonderpush', telField: 'tel',
+    chips: () => [],
+    GROUPS: [
+      { title: 'Standort', fields: [['standort', 'Standort (z. B. Telekom Partner Crailsheim)', 'text']] },
+      { title: 'Mobilfunk', fields: [['po', 'PO Neu'], ['poC', 'PO Neu Congstar'], ['vvl', 'VVL'], ['vvlC', 'VVL Congstar']] },
+      { title: 'Festnetz', fields: [['dp', 'T-Com Neu/WW DP'], ['tp', 'T-Com Neu/WW TP'], ['fnVvl', 'T-Com VVL']] },
+      { title: 'Marge, Zubehör & Service', fields: [['gesamtmarge', 'Gesamtmarge €'], ['zubStk', 'Zubehör Stück'], ['zubMarge', 'Zubehör Marge €'], ['inst', 'Installationsservice (Stück)'], ['instVor', 'Installation vor Ort (Stück)']] },
+      { title: 'Qualität (leer = Abzug)', fields: [['tel', 'Telefonie gesamt (VVL Telefonie + Abfrage)'], ['pencil', 'Pencil Selling %'], ['werb', 'Werbeversprechen %']] },
+      { title: 'Abwesenheit', fields: [['urlaub', 'Urlaub (Tage)'], ['krank', 'Krank (Tage)']] }
+    ],
+    RULE_GROUPS: [
+      ['Persönliche Marge', [['margeSockel', 'Sockel €', 1], ['margeAnteil', 'Anteil %', 100]]],
+      ['Mobilfunk', [['neuSockel', 'PO neu gesamt Sockel', 1], ['neuBetrag', 'PO neu gesamt €', 1], ['vvlSockel', 'VVL gesamt Sockel', 1], ['vvlBetrag', 'VVL gesamt €', 1]]],
+      ['Festnetz', [['dpSockel', 'DP Sockel', 1], ['dpBetrag', 'DP €', 1], ['tpSockel', 'TP Sockel', 1], ['tpBetrag', 'TP €', 1], ['fnVvlSockel', 'T-Com VVL Sockel', 1], ['fnVvlBetrag', 'T-Com VVL €', 1]]],
+      ['Zubehör & Service', [['zubSockel', 'Zubehör Sockel €', 1], ['zubAnteil', 'Zubehör Anteil %', 100], ['instBetrag', 'Installationsservice €', 1], ['instVorBetrag', 'Installation vor Ort €', 1]]],
+      ['Urlaub/Krankheit', [['abwBetrag', '€ je Tag', 1]]],
+      ['Qualitätssicherung (Malus)', [['abzug', 'Malus je Ziel %', 100], ['telSoll', 'Telefonie gesamt Soll', 1], ['pencilSoll', 'Pencil Selling Soll %', 100], ['werbSoll', 'Werbeversprechen Soll %', 100]]],
+      ['Absicherung', [['fix', 'Provisionsabsicherung €', 1]]],
+      ['Zielpunkte (Info im PDF)', [['zielMarge', 'Marge €', 1], ['zielNeu', 'PO neu gesamt', 1], ['zielVvl', 'VVL gesamt', 1], ['zielDp', 'DP', 1], ['zielTp', 'TP', 1], ['zielFnVvl', 'T-Com VVL', 1], ['zielZub', 'Zubehör Marge €', 1]]]
+    ],
+    kpis: [
+      { h: 'Marge', title: 'Gesamtmarge', v: i => i.gesamtmarge === '' ? '–' : Math.round(Number(i.gesamtmarge)).toLocaleString('de-DE') },
+      { h: 'PO', title: 'PO neu gesamt', v: i => num((Number(i.po) || 0) + (Number(i.poC) || 0)) }, { h: 'VVL', title: 'VVL gesamt', v: i => num((Number(i.vvl) || 0) + (Number(i.vvlC) || 0)) },
+      { h: 'DP', v: i => show(i.dp) }, { h: 'TP', v: i => show(i.tp) }, { h: 'FN-VVL', title: 'T-Com VVL', v: i => show(i.fnVvl) },
+      { h: 'Zub.', title: 'Zubehör Marge €', v: i => show(i.zubMarge) },
+      { h: 'Tel.', q: 'tel', v: i => show(i.tel) }, { h: 'Pencil', q: 'pencil', v: i => pcS(i.pencil) }, { h: 'DNE', q: 'werb', v: i => pcS(i.werb) },
+      { h: 'Abw.', v: i => num((Number(i.urlaub) || 0) + (Number(i.krank) || 0)) }
+    ],
+    todo: (inp, row) => {
+      const t = [];
+      if (inp.tel === '') t.push({ k: 'tel', t: 'Telefonie fehlt' });
+      if (inp.pencil === '') t.push({ k: 'pencil', t: 'Pencil Selling fehlt' });
+      if (inp.werb === '') t.push({ k: 'werb', t: 'Werbeversprechen fehlt' });
+      row.warn.forEach(w => { if (w.startsWith('Name in A1')) t.push({ t: w }); });
+      if (row.warn.includes('Spalte Urlaub/Krank fehlt') && inp.urlaub === '') t.push({ t: 'Urlaub/Krank fehlt' });
+      return t;
+    }
+  }
+};
 
 function Field({ label, value, onChange, type = 'number', placeholder }) {
   return (
@@ -856,13 +1326,13 @@ function Rules({ R, setR }) {
     <div className="card">
       <button className="link" onClick={() => setOpen(o => !o)} aria-expanded={open}>{open ? 'Regeln ausblenden' : 'Regeln anpassen'}</button>
       {open && (<>
-        {RULE_GROUPS.map(([t, fs]) => (
+        {CUR.RULE_GROUPS.map(([t, fs]) => (
           <div key={t} className="rulegroup"><h3>{t}</h3>
             <div className="grid rules">{fs.map(([k, l, m]) => (
               <Field key={k} label={l} value={String(Math.round(R[k] * m * 1000) / 1000)} onChange={v => setR(s => ({ ...s, [k]: (parseFloat(String(v).replace(',', '.')) || 0) / m }))} />
             ))}</div>
           </div>))}
-        <button className="link" onClick={() => setR({ ...DEFAULT_RULES, _v: RULES_VERSION })}>Standardregeln wiederherstellen</button>
+        <button className="link" onClick={() => setR({ ...CUR.core.DEFAULT_RULES, _v: CUR.core.RULES_VERSION })}>Standardregeln wiederherstellen</button>
       </>)}
     </div>
   );
@@ -876,23 +1346,22 @@ function Sheet({ inp, res, R }) {
         <div><small>Monat</small><strong>{inp.monat} {inp.jahr}</strong></div>
       </div>
       <div className="quotes">
-        <span className={res.q.dsl > R.dslSoll ? 'ok' : 'no'}>DSL {pf(res.q.dsl)}</span>
-        <span>KS {pf(res.q.ks)}</span>
+        {CUR.chips(res, R).map(([t, c]) => <span key={t} className={c || ''}>{t}</span>)}
       </div>
       <table className="calc"><tbody>
         {res.rows.map(r => (
           <tr key={r.row} className={r.aus ? '' : 'zero'}>
-            <td>{r.label}<small>{r.row === 'push' ? 'exklusiv' : r.euro ? eur(r.rel) : num(r.rel) + ' × ' + eur(r.betrag)}</small></td>
+            <td>{r.label}<small>{r.row === 'push' ? 'exklusiv' : r.hint ? r.hint : r.pctBetrag ? eur(r.rel) + ' × ' + pf(r.betrag) : r.euro ? eur(r.rel) : num(r.rel) + ' × ' + eur(r.betrag)}</small></td>
             <td className="amt">{eur(r.aus)}</td>
           </tr>))}
         <tr className="sum"><td>Summe Provision</td><td className="amt">{eur(res.summe)}</td></tr>
         {res.sl && <tr className={res.sl.betrag ? 'pos' : 'zero'}><td>Shopleiter-Provision<small>Ziel {eur(res.sl.ziel)} · Ist {eur(res.sl.ist)} · {pf(res.sl.quote)}</small></td><td className="amt">{eur(res.sl.betrag)}</td></tr>}
         {res.qual.map(x => (
           <tr key={x.row} className={x.betrag ? 'neg' : 'zero'}>
-            <td>{x.label}<small>{x.rated ? `Soll ${x.fmt === 'pct' ? pf(x.soll) : num(x.soll)} · Ist ${x.fmt === 'pct' ? pf(x.ist) : num(x.ist)}` : 'fehlt – Abzug'}</small></td>
+            <td>{x.label}<small>{x.rated ? `Soll ${fmtQ(x, x.soll)} · Ist ${fmtQ(x, x.ist)}` : x.optional ? 'fehlt – nicht bewertet' : 'fehlt – Abzug'}</small></td>
             <td className="amt">{eur(x.betrag)}</td>
           </tr>))}
-        <tr className={res.msy.betrag ? 'pos' : 'zero'}><td>{res.msy.label}</td><td className="amt">{eur(res.msy.betrag)}</td></tr>
+        {res.msy.label && <tr className={res.msy.betrag ? 'pos' : 'zero'}><td>{res.msy.label}</td><td className="amt">{eur(res.msy.betrag)}</td></tr>}
         {res.korr.filter(k => k.betrag).map(k => <tr key={k.row} className="pos"><td>{k.label}<small>{k.note}</small></td><td className="amt">{eur(k.betrag)}</td></tr>)}
         {res.sonder.betrag !== 0 && <tr className="pos"><td>Sonderprovision<small>{res.sonder.text || 'ohne Anlass'}</small></td><td className="amt">{eur(res.sonder.betrag)}</td></tr>}
       </tbody></table>
@@ -918,7 +1387,7 @@ function Editor({ inp, R, onPatch, onReset, onBack, onXlsx, onPdf, busy, importe
         <section className="inputs">
           <div className="card">
             <h2>Mitarbeiter</h2>
-            <label className="check" style={{ marginBottom: 12 }}><input type="checkbox" checked={!!inp.teilzeit} onChange={e => onPatch({ teilzeit: e.target.checked })} /> Azubi / Teilzeit (Ziel {R.tvSollTZ} TV, {R.osSollTZ} Online-Schutz)</label>
+            {CUR.features.teilzeit && <label className="check" style={{ marginBottom: 12 }}><input type="checkbox" checked={!!inp.teilzeit} onChange={e => onPatch({ teilzeit: e.target.checked })} /> Azubi / Teilzeit (Ziel {R.tvSollTZ} TV, {R.osSollTZ} Online-Schutz)</label>}
             <div className="grid">
               <Field label="Name (Abrechnung)" type="text" value={inp.name} onChange={up('name')} />
               <Field label="Vor- und Nachname (Vereinbarung)" type="text" value={inp.vollerName} onChange={up('vollerName')} />
@@ -936,7 +1405,7 @@ function Editor({ inp, R, onPatch, onReset, onBack, onXlsx, onPdf, busy, importe
             </div>
           </div>
           <div className="card">
-            <h2>Push-Provision</h2>
+            <h2>{CUR.pushLabel}</h2>
             <div className="grid two">
               <Field label="Betrag €" value={inp.pushBetrag} onChange={up('pushBetrag')} />
               <Field label="Bezeichnung (z. B. o2 TV Push)" type="text" value={inp.pushText} onChange={up('pushText')} />
@@ -952,10 +1421,10 @@ function Editor({ inp, R, onPatch, onReset, onBack, onXlsx, onPdf, busy, importe
               {res.sl && <p className="slres">Zielerreichung {pf(res.sl.quote)} → <b>{eur(res.sl.betrag)}</b></p>}
             </div>)}
           </div>
-          {GROUPS.map(g => (
+          {CUR.GROUPS.map(g => (
             <div className="card" key={g.title}>
               <h2>{g.title}</h2>
-              <div className="grid">{g.fields.map(([k, l]) => <Field key={k} label={l} value={inp[k]} onChange={up(k)} />)}</div>
+              <div className="grid">{g.fields.map(([k, l, t]) => <Field key={k} label={l} type={t || "number"} value={inp[k]} onChange={up(k)} />)}</div>
             </div>
           ))}
           <div className="card">
@@ -966,7 +1435,7 @@ function Editor({ inp, R, onPatch, onReset, onBack, onXlsx, onPdf, busy, importe
                 const set = m => onPatch({ ['gs_' + k.key]: mode === m ? '' : m });
                 return (
                   <div className={'gsrow' + (k.abzug > 0 ? '' : ' none')} key={k.key}>
-                    <div className="gsname"><strong>{GS_LABELS[k.key]}</strong><small>{k.abzug > 0 ? 'Abzug ' + eur(-k.abzug) : 'kein Abzug'}</small></div>
+                    <div className="gsname"><strong>{CUR.GS_LABELS[k.key]}</strong><small>{k.abzug > 0 ? 'Abzug ' + eur(-k.abzug) : 'kein Abzug'}</small></div>
                     <label className="check"><input type="checkbox" disabled={!(k.abzug > 0)} checked={mode === 'voll'} onChange={() => set('voll')} /> Gutschrift</label>
                     <label className="check"><input type="checkbox" disabled={!(k.abzug > 0)} checked={mode === 'teil'} onChange={() => set('teil')} /> Gutschrift mit Teilzahlung</label>
                     {mode === 'teil' && k.abzug > 0 && <label className="field inline"><span>Betrag €</span><input type="number" inputMode="decimal" value={inp['gsb_' + k.key] ?? ''} onChange={e => onPatch({ ['gsb_' + k.key]: e.target.value })} /></label>}
@@ -994,13 +1463,13 @@ function Editor({ inp, R, onPatch, onReset, onBack, onXlsx, onPdf, busy, importe
 }
 
 function App() {
-  const [R, setR] = useState(() => { const s = load('provi_rules', {}); return s && s._v === RULES_VERSION ? { ...DEFAULT_RULES, ...s } : { ...DEFAULT_RULES, _v: RULES_VERSION }; });
-  const [data, setData] = useState(() => load('provi_data', null));
-  const [meta, setMeta] = useState(() => load('provi_meta', { monat: '', jahr: String(new Date().getFullYear()), ort: '', datum: heute() }));
-  const [ov, setOv] = useState(() => load('provi_ov', {}));
-  const [slSet, setSlSet] = useState(() => load('provi_sl', SL_DEFAULTS));
-  const [tzSet, setTzSet] = useState(() => load('provi_tz', {}));
-  const [manual, setManual] = useState(() => load('provi_manual', { ...BLANK, name: '', vollerName: '' }));
+  const [R, setR] = useState(() => { const s = load(pk('rules'), {}); return s && s._v === CUR.core.RULES_VERSION ? { ...CUR.core.DEFAULT_RULES, ...s } : { ...CUR.core.DEFAULT_RULES, _v: CUR.core.RULES_VERSION }; });
+  const [data, setData] = useState(() => load(pk('data'), null));
+  const [meta, setMeta] = useState(() => load(pk('meta'), { monat: '', jahr: String(new Date().getFullYear()), ort: '', datum: heute() }));
+  const [ov, setOv] = useState(() => load(pk('ov'), {}));
+  const [slSet, setSlSet] = useState(() => load(pk('sl'), CUR.SL_DEFAULTS));
+  const [tzSet, setTzSet] = useState(() => load(pk('tz'), {}));
+  const [manual, setManual] = useState(() => load(pk('manual'), { ...CUR.BLANK, name: '', vollerName: '' }));
   const [edit, setEdit] = useState(null); // sheet-Name | '__manual'
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
@@ -1008,13 +1477,13 @@ function App() {
   const fileRef = useRef();
   const telRef = useRef();
   const bakRef = useRef();
-  useEffect(() => save('provi_rules', R), [R]);
-  useEffect(() => save('provi_data', data), [data]);
-  useEffect(() => save('provi_meta', meta), [meta]);
-  useEffect(() => save('provi_ov', ov), [ov]);
-  useEffect(() => save('provi_sl', slSet), [slSet]);
-  useEffect(() => save('provi_tz', tzSet), [tzSet]);
-  useEffect(() => save('provi_manual', manual), [manual]);
+  useEffect(() => save(pk('rules'), R), [R]);
+  useEffect(() => save(pk('data'), data), [data]);
+  useEffect(() => save(pk('meta'), meta), [meta]);
+  useEffect(() => save(pk('ov'), ov), [ov]);
+  useEffect(() => save(pk('sl'), slSet), [slSet]);
+  useEffect(() => save(pk('tz'), tzSet), [tzSet]);
+  useEffect(() => save(pk('manual'), manual), [manual]);
 
   const key = sheet => `${meta.jahr}|${meta.monat}|${sheet}`;
   const shared = { monat: meta.monat, jahr: meta.jahr, ort: meta.ort, datum: meta.datum };
@@ -1025,22 +1494,17 @@ function App() {
       const row = e.rows[meta.monat];
       const o = ov[key(e.sheet)] || {};
       const tel = data.telefonie ? matchTelefonie(e.fullName, data.telefonie.list) : null;
-      const base = { ...BLANK, ...row.inp, ...(tel ? { marketing: tel.tel } : {}) };
+      const base = { ...CUR.BLANK, ...row.inp, ...(tel ? { [CUR.telField]: tel.tel } : {}) };
       const sl = slSet[e.sheet] || {};
       const inp = { ...base, name: e.sheet, vollerName: e.fullName, ...shared, ...(o.fields || {}),
         teilzeit: !!tzSet[e.sheet], shopleiter: !!sl.on, slRate1: sl.r1 ?? '', slRate2: sl.r2 ?? '', slZiel: (o.fields || {}).slZiel ?? sl.ziel ?? '', slIst: (o.fields || {}).slIst ?? '' };
       const include = o.include ?? row.active;
-      const todo = [];
-      const ov2 = o.fields || {};
-      if (inp.werb === '') todo.push(row.warn.find(w => w.startsWith('Werbeversprechen ungültig')) || 'Werbeversprechen fehlt');
-      if (inp.pencil === '') todo.push('Pencil Selling fehlt');
-      if (inp.marketing === '') todo.push(data.telefonie ? 'Telefonie: Name nicht gefunden' : 'Telefonie fehlt');
-      if (inp.shopleiter && !(Number(inp.slZiel) > 0)) todo.push('Shopleiter: Margenziel fehlt');
-      if (inp.shopleiter && inp.slIst === '') todo.push('Shopleiter: Marge-Ist fehlt');
-      if (!('urlaub' in ov2) && row.warn.includes('Spalte Urlaub/Krank fehlt')) todo.push('Urlaub/Krank fehlt');
+      const todo = CUR.todo(inp, row, data);
+      if (inp.shopleiter && !(Number(inp.slZiel) > 0)) todo.push({ t: 'Shopleiter: Margenziel fehlt' });
+      if (inp.shopleiter && inp.slIst === '') todo.push({ t: 'Shopleiter: Marge-Ist fehlt' });
       const res0 = calc(inp, R);
       const credited = id => { const qx = res0.qual.find(q => q.row === id); const k = res0.korr.find(c => c.key === id); return !!(qx && k && qx.betrag < 0 && k.betrag >= -qx.betrag); };
-      const todoF = todo.filter(t => !((t.startsWith('Werbeversprechen') && credited('werb')) || (t.startsWith('Pencil') && credited('pencil')) || (t.startsWith('Telefonie') && credited('marketing'))));
+      const todoF = todo.filter(t => !(t.k && credited(t.k))).map(t => t.t);
       return { e, row, inp, include, todo: todoF, tel, credited, edited: !!(o.fields && Object.keys(o.fields).some(k => !['sonderBetrag', 'sonderText', 'slZiel', 'slIst', 'notiz'].includes(k))), res: res0 };
     });
   }, [data, meta, ov, R, slSet, tzSet]);
@@ -1066,7 +1530,7 @@ function App() {
     try {
       const wb = new ExcelJS.Workbook();
       await wb.xlsx.load(await file.arrayBuffer());
-      const d = parsePerformance(wb);
+      const d = CUR.core.parsePerformance(wb);
       if (!d.employees.length) throw new Error('Keine Mitarbeiterblätter mit Spalte „PO gesamt“ gefunden.');
       setData(old => ({ ...d, telefonie: old?.telefonie, file: file.name, loaded: new Date().toISOString() }));
       setMeta(m => ({ ...m, monat: d.months.includes(m.monat) ? m.monat : (d.months[d.months.length - 1] || MONATE[0]) }));
@@ -1099,8 +1563,8 @@ function App() {
       }
       // Übersicht
       const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Übersicht');
-      ws.columns = [{ header: 'Mitarbeiter', width: 28 }, { header: 'Blatt', width: 16 }, { header: 'PO gesamt', width: 10 }, { header: 'VVL', width: 8 }, { header: 'DSL', width: 8 }, { header: 'KS', width: 8 }, { header: 'Summe Provision', width: 16 }, { header: 'Shopleiter-Provision', width: 18 }, { header: 'Abzüge Qualität', width: 16 }, { header: 'Sonderprovision', width: 16 }, { header: 'Anlass', width: 36 }, { header: 'Auszahlung', width: 14 }, { header: 'Hinweis', width: 60 }];
-      chosen.forEach(x => ws.addRow([x.inp.vollerName, x.e.sheet, x.res.q.poGes, Number(x.inp.vvl) || 0, Number(x.inp.dsl) || 0, Number(x.inp.ks) || 0, x.res.summe, x.res.sl ? x.res.sl.betrag : 0, x.res.qual.reduce((s, q) => s + q.betrag, 0), x.res.sonder.betrag, x.res.sonder.text, x.res.total, x.todo.length ? 'Handlungsbedarf: ' + x.todo.join(', ') : '']));
+      ws.columns = [{ header: 'Mitarbeiter', width: 28 }, { header: 'Blatt', width: 16 }, { header: 'Bereich', width: 12 }, { header: '', width: 2 }, { header: '', width: 2 }, { header: '', width: 2 }, { header: 'Summe Provision', width: 16 }, { header: 'Shopleiter-Provision', width: 18 }, { header: 'Abzüge Qualität', width: 16 }, { header: 'Sonderprovision', width: 16 }, { header: 'Anlass', width: 36 }, { header: 'Auszahlung', width: 14 }, { header: 'Hinweis', width: 60 }];
+      chosen.forEach(x => ws.addRow([x.inp.vollerName, x.e.sheet, CUR.title, '', '', '', x.res.summe, x.res.sl ? x.res.sl.betrag : 0, x.res.qual.reduce((s, q) => s + q.betrag, 0), x.res.sonder.betrag, x.res.sonder.text, x.res.total, x.todo.length ? 'Handlungsbedarf: ' + x.todo.join(', ') : '']));
       chosen.forEach((x, k) => { if (x.todo.length) ws.getRow(k + 2).eachCell({ includeEmpty: true }, c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE0E0' } }; }); });
       const last = chosen.length + 1;
       ws.addRow(['Gesamt', '', '', '', '', '', ...['G', 'H', 'I', 'J'].map(c => ({ formula: `SUM(${c}2:${c}${last})` })), '', { formula: `SUM(L2:L${last})` }]);
@@ -1109,8 +1573,8 @@ function App() {
       zip.file(`Uebersicht_${safe(meta.monat)}_${meta.jahr}.xlsx`, await wb.xlsx.writeBuffer());
       return zip.generateAsync({ type: 'uint8array' });
   }
-  const backupObj = () => ({ app: 'hetec-provisionsabrechnung', version: 1, erstellt: new Date().toISOString(), data, meta, ov, slSet, tzSet, R, manual });
-  const backupName = () => `Sicherung_Provision_${safe(meta.monat)}_${meta.jahr}_${new Date().toISOString().slice(0, 10)}.json`;
+  const backupObj = () => ({ app: 'hetec-provisionsabrechnung', profil: CUR.id, version: 1, erstellt: new Date().toISOString(), data, meta, ov, slSet, tzSet, R, manual });
+  const backupName = () => `Sicherung_Provision_${CUR.id}_${safe(meta.monat)}_${meta.jahr}_${new Date().toISOString().slice(0, 10)}.json`;
   function saveBackup() {
     download(new Blob([JSON.stringify(backupObj(), null, 1)], { type: 'application/json' }), backupName());
     setMsg('Sicherung gespeichert. Mit „Sicherung laden“ stellst du später alles wieder her, auch auf einem anderen Gerät.');
@@ -1119,13 +1583,14 @@ function App() {
     try {
       const b = JSON.parse(await file.text());
       if (b.app !== 'hetec-provisionsabrechnung') throw new Error('Keine Sicherung dieser App.');
+      if ((b.profil || 'o2') !== CUR.id) throw new Error(`Diese Sicherung gehört zum Bereich „${(b.profil || 'o2') === 'fh' ? 'Fachhandel' : 'o2 Shops'}“. Bitte oben umschalten.`);
       if (!confirm(`Sicherung vom ${new Date(b.erstellt).toLocaleString('de-DE')} (${b.meta?.monat || ''} ${b.meta?.jahr || ''}) laden? Der aktuelle Stand wird ersetzt.`)) return;
       if (b.data !== undefined) setData(b.data);
       if (b.meta) setMeta(b.meta);
       if (b.ov) setOv(b.ov);
       if (b.slSet) setSlSet(b.slSet);
       if (b.tzSet) setTzSet(b.tzSet);
-      if (b.R) setR({ ...DEFAULT_RULES, ...b.R });
+      if (b.R) setR({ ...CUR.core.DEFAULT_RULES, ...b.R });
       if (b.manual) setManual(b.manual);
       setEdit(null);
       setMsg(`Sicherung „${file.name}“ geladen.`);
@@ -1281,8 +1746,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
             <table className="list">
               <thead><tr>
                 <th></th><th>Mitarbeiter</th>
-                <th className="n">PO</th><th className="n">VVL</th><th className="n">DSL</th><th className="n">KS</th><th className="n">TV</th><th className="n">OS</th>
-                <th className="n">DNE</th><th className="n">Pencil</th><th className="n">Tel.</th><th className="n">Abw.</th>
+                {CUR.kpis.map(k => <th key={k.h} className="n" title={k.title || ''}>{k.h}</th>)}
                 <th>Sonderprovision</th><th className="r">Auszahlung</th><th></th>
               </tr></thead>
               <tbody>
@@ -1296,30 +1760,26 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
                       <td className="who">
                         <strong>{x.e.fullName}</strong>
                         <span className="toggles">
-                          <label className="tgl"><input type="checkbox" checked={!!i.teilzeit} onChange={ev => patchSl(x.e.sheet, { teilzeit: ev.target.checked })} />Azubi/TZ</label>
+                          {CUR.features.teilzeit && <label className="tgl"><input type="checkbox" checked={!!i.teilzeit} onChange={ev => patchSl(x.e.sheet, { teilzeit: ev.target.checked })} />Azubi/TZ</label>}
                           <label className="tgl"><input type="checkbox" checked={!!i.shopleiter} onChange={ev => patchSl(x.e.sheet, { shopleiter: ev.target.checked })} />Shopleiter</label>
                           {x.edited && <small className="tag">bearbeitet</small>}
                           {x.inp.notiz && <small className="tag note" title={x.inp.notiz}>Notiz</small>}
                           {!x.row.active && <small className="tag">keine Werte</small>}
                         </span>
                         {(() => {
-                          const SH = { werb: 'Werbeversprechen', pencil: 'Pencil Selling', marketing: 'Telefonie', tv: 'o2 TV', os: 'Online-Schutz' };
+                          const SH = CUR.GS_LABELS;
                           const ab = x.res.qual.filter(q => q.betrag < 0 && !x.credited(q.row));
                           if (!ab.length) return null;
                           return (<div className="abz">{ab.map(q => {
                             const k = x.res.korr.find(c => c.key === q.row);
-                            return <span key={q.row} className="chip neg" title={k && k.note ? k.note : 'Abzug ' + (q.fmt === 'pct' ? `Soll ${pf(q.soll)} · Ist ${q.rated ? pf(q.ist) : 'fehlt'}` : `Soll ${num(q.soll)} · Ist ${num(q.ist)}`)}>
+                            return <span key={q.row} className="chip neg" title={k && k.note ? k.note : `Abzug · Soll ${fmtQ(q, q.soll)} · Ist ${q.rated ? fmtQ(q, q.ist) : 'fehlt'}`}>
                               {SH[q.row]} {eur(q.betrag)}{k && k.betrag ? ' · Teilgutschrift ' + eur(k.betrag) : ''}
                             </span>;
                           })}</div>);
                         })()}
                         {x.todo.length > 0 && <small className="todo">Handlungsbedarf: {x.todo.join(', ')}</small>}
                       </td>
-                      <td className="n">{show(x.res.q.poGes)}</td><td className="n">{show(i.vvl)}</td><td className="n">{show(i.dsl)}</td><td className="n">{show(i.ks)}</td>
-                      {(() => { const bad = id => (x.res.qual.find(q => q.row === id) || {}).betrag < 0 && !x.credited(id) ? 'n bad' : 'n'; return (<>
-                      <td className={bad('tv')}>{show(i.tv)}</td><td className={bad('os')}>{show(i.schutzOnline)}</td>
-                      <td className={bad('werb')}>{pc(i.werb)}</td><td className={bad('pencil')}>{pc(i.pencil)}</td><td className={bad('marketing')}>{show(i.marketing)}</td></>); })()}
-                      <td className="n">{num((Number(i.urlaub) || 0) + (Number(i.krank) || 0))}</td>
+                      {CUR.kpis.map(k => <td key={k.h} className={'n' + (k.q && (x.res.qual.find(q => q.row === k.q) || {}).betrag < 0 && !x.credited(k.q) ? ' bad' : '')}>{k.v(i, x.res)}</td>)}
                       <td className="sp">
                         <input className="mini" inputMode="decimal" aria-label="Sonderprovision Betrag" value={f.sonderBetrag ?? ''} placeholder="€" onChange={ev => patch(x.e.sheet, { fields: { sonderBetrag: ev.target.value } })} />
                         <input className="mini" aria-label="Anlass Sonderprovision" value={f.sonderText ?? ''} placeholder="Anlass" onChange={ev => patch(x.e.sheet, { fields: { sonderText: ev.target.value } })} />
@@ -1366,10 +1826,21 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
 }
 
 function Header() {
-  return (<header><h1>Provisionsabrechnung</h1><p>Performance-Excel einlesen, prüfen, Provision generieren.</p></header>);
+  return (<header><h1>Provisionsabrechnung <span className="mode">{CUR.title}</span></h1><p>Performance-Excel einlesen, prüfen, Provision generieren.</p></header>);
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+function Root() {
+  const [mode, setMode] = useState(() => { try { return localStorage.getItem('provi_mode') || 'o2'; } catch (e) { return 'o2'; } });
+  CUR = PROFILES[mode] || PROFILES.o2;
+  const pick = m => { try { localStorage.setItem('provi_mode', m); } catch (e) {} setMode(m); };
+  return (<>
+    <nav className="modes" aria-label="Bereich">
+      {Object.values(PROFILES).map(p => <button key={p.id} className={p.id === mode ? 'on' : ''} aria-pressed={p.id === mode} onClick={() => pick(p.id)}>{p.title}</button>)}
+    </nav>
+    <App key={mode} />
+  </>);
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
 </script>
 <script>if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
 </body></html>
