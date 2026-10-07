@@ -627,7 +627,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     doc.setFont(F, 'normal'); doc.setFontSize(8.5); doc.text(inp.monat || '', zx + zw - 12, y - 1.8, { align: 'center' });
 
     y += 18; t('zwischen der', L, y);
-    y += 9; t('HeTec Shop GmbH, Ludwigstraße 30, 84524 Neuötting', L, y, { bold: true });
+    y += 9; t((res.firma || {}).adresse || 'HeTec Shop GmbH, Ludwigstraße 30, 84524 Neuötting', L, y, { bold: true });
     y += 5;
     { const w1 = mw('nachstehend „'); doc.setFont(F, 'bold'); doc.setFontSize(10.5); const w2 = doc.getTextWidth('die Gesellschaft');
       t('nachstehend „', 120, y); t('die Gesellschaft', 120 + w1, y, { bold: true }); t('“ genannt –', 120 + w1 + w2, y); }
@@ -674,7 +674,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     fld(L, y, 38, inp.ort); t(', den ', L + 38, y); fld(L + 38 + mw(', den '), y, 36, inp.datum);
     y += 26;
     doc.setLineWidth(0.2); doc.line(L, y, L + 75, y); doc.line(110, y, Rr, y);
-    t('HeTec Shop GmbH', L, y + 3.6, { size: 7.5 }); t('Arbeitnehmer', 110, y + 3.6, { size: 7.5 });
+    t((res.firma || {}).name || 'HeTec Shop GmbH', L, y + 3.6, { size: 7.5 }); t('Arbeitnehmer', 110, y + 3.6, { size: 7.5 });
     y += 16;
     doc.setFont(F, 'normal'); doc.setFontSize(7.5);
     doc.text('Die Bezeichnung „Arbeitnehmer“ steht für Arbeitnehmer jeden Geschlechts und wird in diesem Vertrag aus Gründen der Lesbarkeit einheitlich in der maskulinen Sprachversion verwendet.', 105, y, { align: 'center', maxWidth: 175 });
@@ -692,7 +692,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     t('Sonderprovisionsvereinbarung', 105, y, { bold: true, align: 'center' });
     y += 5; t(`für den Monat ${mi.vereinbarung}`, 105, y, { bold: true, align: 'center' });
     y += 18; t('zwischen der', L, y);
-    y += 9; t('HeTec Shop GmbH, Ludwigstraße 30, 84524 Neuötting', L, y, { bold: true });
+    y += 9; t((res.firma || {}).adresse || 'HeTec Shop GmbH, Ludwigstraße 30, 84524 Neuötting', L, y, { bold: true });
     y += 5; t('– nachstehend „die Gesellschaft“ genannt –', Rr, y, { align: 'right' });
     y += 5; t('und', L, y);
     y += 12; t(inp.vollerName || inp.name || '', L, y, { bold: true });
@@ -714,7 +714,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     doc.setFontSize(8.5); doc.text(String(inp.ort || ''), L + 19, y - 0.4, { align: 'center' }); doc.text(String(inp.datum || ''), L + 68, y - 0.4, { align: 'center' });
     y += 26;
     doc.line(L, y, L + 75, y); doc.line(110, y, Rr, y);
-    t('HeTec Shop GmbH', L, y + 3.6, { size: 7.5 }); t('Arbeitnehmer', 110, y + 3.6, { size: 7.5 });
+    t((res.firma || {}).name || 'HeTec Shop GmbH', L, y + 3.6, { size: 7.5 }); t('Arbeitnehmer', 110, y + 3.6, { size: 7.5 });
   }
 
   // ---------- Import Performance-Excel ----------
@@ -813,23 +813,25 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
 <script>(function (root) {
   const B = root.Provi;
   const { MONATE, cellVal, addZusatz, addSonder } = B;
-  const RULES_VERSION = 2;
+  const RULES_VERSION = 3;
   const DEFAULT_RULES = {
     margeSockel: 5500, margeAnteil: 0.08,
     neuSockel: 5, neuBetrag: 20,
-    vvlSockel: 5, vvlBetrag: 5,
-    dpSockel: 3, dpBetrag: 15,
+    vvlSockel: 5, vvlBetrag: 5, vvlMitCongstar: 0,
+    dpSockel: 3, dpBetrag: 15, dpMitTp: 1,
     tpSockel: 0, tpBetrag: 15,
     fnVvlSockel: 0, fnVvlBetrag: 10,
+    ksSockel: 2, ksBetrag: 10,
     zubSockel: 50, zubAnteil: 0.5,
-    instBetrag: 10, instVorBetrag: 10,
+    instBetrag: 10, instVorBetrag: 10, pushEinzel: 10,
     abwBetrag: 10,
-    abzug: 0.25,
-    telSoll: 200, pencilSoll: 0.75, werbSoll: 0.85,
+    telSoll: 200, telAbzug: 0.25, pencilSoll: 0.75, pencilAbzug: 0.25, werbSoll: 0.85, werbAbzug: 0.10,
+    intSoll: 10, intAbzug: 0, tvqSoll: 0.80, tvqAbzug: 0, ergSoll: 10000, ergAbzug: 0,
     fix: 250,
-    zielMarge: 5000, zielNeu: 15, zielVvl: 25, zielDp: 5, zielTp: 2, zielFnVvl: 5, zielZub: 200
+    zielMarge: 5000, zielNeu: 10, zielNeuC: 5, zielVvl: 20, zielVvlC: 5, zielDp: 5, zielTp: 2, zielFnVvl: 5, zielKs: 5, zielZub: 200, zielInst: 0, zielInstVor: 0
   };
-  const GS = [['tel', 'Korrektur VVL Telefonie + Abfrage'], ['pencil', 'Korrektur Pencil Selling'], ['werb', 'Korrektur Werbeversprechen']];
+  const FIRMA = { name: 'HeTec Handytarifmakler GmbH', adresse: 'HeTec Handytarifmakler GmbH, Herzog-Nikolaus-Str. 6, 83371 Stein an der Traun' };
+  const GS = [['tel', 'Korrektur VVL Telefonie + Abfrage'], ['pencil', 'Korrektur Pencil Selling'], ['werb', 'Korrektur Werbeversprechen'], ['int', 'Korrektur Interessentenerfassung'], ['tvq', 'Korrektur TV-Aktivierungsquote'], ['erg', 'Korrektur Ergebnissicherung']];
 
   const n = v => { const x = parseFloat(String(v ?? '').replace(',', '.')); return isFinite(x) ? x : 0; };
   const pct = v => n(v) / 100;
@@ -840,27 +842,36 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
   const has = v => !(v === '' || v == null);
 
   function regularien(R) {
+    const p0 = v => Math.round(v * 1000) / 10 + '%';
+    const ab = r => r > 0 ? `= ${p0(r)} Provisionsabzug für den Mitarbeiter` : '= aktuell kein Provisionsabzug';
     return {
       malus: [
-        `VVL Prozess: Unter ${R.telSoll} VVL Prozess Aktionen (Festnetz Abfrage + Festnetz Telefonie + Mobilfunk Telefonie) = ${pf(R.abzug)} Provisionsabzug. Ziel: Shop hat VVL Prozess Festnetz & Mobilfunk zu 100 % bearbeitet. 1x Festnetzabfrage & 1x Festnetztelefonie bei einem Datensatz = 2 Zähler.`,
-        `Pencil Selling (digital): Pencil-Selling-Quote (sofortige Speicherpflicht in Vedemophone) unter ${pf(R.pencilSoll)} bezogen auf Verkäufe (PO Neu + VVL + DSL) = ${pf(R.abzug)} Provisionsabzug.`,
-        `Werbeversprechen: Liegt das Telefusion-Werbeversprechen unter ${pf(R.werbSoll)} = ${pf(R.abzug)} Provisionsabzug.`,
-        `Provisionsabsicherung: mindestens ${eur(R.fix)} pro Monat.`
+        ['VVL Prozess:', ` Unter ${R.telSoll} VVL Prozess Aktionen: Festnetz Abfrage + Festnetz Telefonie + Mobilfunk Telefonie ${ab(R.telAbzug)}`],
+        ['', ''],
+        ['', 'Ziel: Shop hat VVL Prozess Festnetz & Mobilfunk zu 100% bearbeitet'],
+        ['', '1x Festnetzabfrage & 1x Festnetztelefonie  bei einem Datensatz = 2 Zähler'],
+        ['Pencil Selling (digital):', ` Pencil-Selling Quote (sofortige Speicherpflicht in Vedemophone) unter ${p0(R.pencilSoll)} bezogen auf Verkäufe (Po Neu + VVL + DSL) ${ab(R.pencilAbzug)}`],
+        ['Werbeversprechen:', ` Wenn dein Telefusion Werbeversprechen unter ${p0(R.werbSoll)} liegt ${ab(R.werbAbzug)}`],
+        ['Interessentenerfassung:', ` Mindestziel sind ${R.intSoll} Stück / Monat (Vedemophone Eintragung + Werbeversprechen) ;  Nichterreichung ${ab(R.intAbzug)}`],
+        ['TV-Aktivierungsquote am Standort:', ` ${p0(R.tvqSoll)} Mindestziel; Nichterreichung ${ab(R.tvqAbzug)}`],
+        ['Ergebnissicherung für Gesellschafter:', ` Wenn die Marge Shop < ${R.ergSoll.toLocaleString('de-DE')} € ${R.ergAbzug > 0 ? '= ' + p0(R.ergAbzug) + ' Malus' : '= aktuell kein Malus'}`]
       ],
       prozess: [
-        'Mitarbeiter befüllt Formblatt und schickt das unterschriebene Formblatt bis zum 5. des Folgemonats an den Vorgesetzten.',
-        'Vorgesetzter meldet bis zum 15. des Monats die unterschriebene Provisionsabrechnung an das Steuerbüro.'
+        'Mitarbeiter befüllt Formblatt und schickt unterschriebenes Formblatt bis zum 5.ten des Folgemonats an Vorgesetzten',
+        '',
+        'Vorgesetzter meldet bis 15.ten des Monats die unterschriebene Provisionsabrechnung an Steuerbüro'
       ],
-      spielregeln: [
-        'KEIN TOP STOP.',
-        'Echte Stücke/echte Margen werden bezahlt, d. h. Korrekturen nach Feedback Controlling.',
-        'Schieben von einem Mitarbeiter zum anderen Mitarbeiter ist ein „No-Go“ (= Abmahnung/Kündigung).',
-        'Gutscheine/Angebote von Netzbetreibern und Distributionen jeglicher Art sind meldepflichtig beim Vorgesetzten, Geschäftsführer bzw. Vertriebsleiter.',
-        'Die Provisionsvereinbarung/Provisionsabrechnung ist streng vertraulich und ausschließlich für den genannten Mitarbeiter bestimmt.',
-        'Erlangt ein Dritter durch Verschulden des Mitarbeiters Kenntnis von den Provisionsdetails, entstehen Schadensersatzansprüche von mindestens 1.000 Euro.',
-        'Es handelt sich um eine freiwillige Leistung, die ohne Anerkennung einer Rechtspflicht gewährt wird und nach billigem Ermessen unterbleiben kann. Auch bei wiederholter Zahlung wird kein Rechtsanspruch für die Zukunft begründet.',
+      spielregeln: name => [
+        'KEIN TOP STOP', '',
+        'echte Stücke/echte Margen werden bezahlt; d.h. Korrekturen nach Feedback Controlling',
+        'schieben von einem Mitarbeiter zum anderen Mitarbeiter ist "no go" (= Abmahnung/Kündigung)',
+        'Gutscheine / Angebote von Netzbetreibern, Distributionen jeglicher Art sind meldepflichtig bei Vorgesetzen Geschäftsführer / Vertriebsleiter',
+        `Die Provisionsvereinbarung / Provisionsabrechnung ist streng vertraulich und ausschließlich nur für ${name} bestimmt.`,
+        'Erlangt ein Dritter, durch Verschulden des Mitarbeiters, Kenntnis von den Provisionsdetails, entstehen Schadensersatzansprüche von mindestens 1000 Euro.',
+        'Es handelt sich hier um eine freiwillige Leistung, die ohne Anerkennung einer Rechtspflicht gewährt wird und die nach billigem Ermessen unterbleiben kann.',
+        'Auch bei wiederholter Zahlung wird kein Rechtsanspruch für die Zukunft begründet.',
         'Die Vereinbarung kann durch den Arbeitgeber aus wirtschaftlichen Gründen jederzeit gekündigt werden.',
-        'Mündliche Nebenabreden zu dieser Abrechnung bestehen nicht. Jede Änderung der Abrechnung muss schriftlich vereinbart werden.',
+        'Mündliche Nebenabreden zu dieser Abrechnung bestehen nicht. Jede Änderung der Abrechnung muss schriftlich vereinbart werden',
         'Die vereinbarte Provision wird im Folgemonat bezahlt.'
       ]
     };
@@ -872,27 +883,38 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     const mk = (row, rich, ist, sockel, betrag, o = {}) => {
       const rel = o.rel != null ? o.rel : Math.max(0, ist - sockel);
       const aus = r2(o.aus != null ? o.aus : rel * betrag);
-      return { row, rich, label: strip(rich), ist, sockel, betrag, rel, aus, euro: !!o.euro, pctBetrag: !!o.pctBetrag, quote: null, hint: o.hint };
+      return { row, rich, label: strip(rich), ist, sockel, betrag, rel, aus, euro: !!o.euro, pctBetrag: !!o.pctBetrag, small: o.small, hint: o.hint };
     };
+    const pushStk = g('pushStk');
+    const pushText = String(inp.pushText || '').trim();
     const rows = [
-      mk('marge', `**persönliche Marge** ${pf(R.margeAnteil)} von größer Sockel/Einstieg`, marge, R.margeSockel, R.margeAnteil, { euro: true, pctBetrag: true }),
-      mk('neu', `**Mobilfunk Neuvertrag gesamt** (PO Neu + Congstar) von größer Sockel/Einstieg`, g('po') + g('poC'), R.neuSockel, R.neuBetrag),
-      mk('vvl', `**Mobilfunk VVL gesamt** (VVL + Congstar) von größer Sockel/Einstieg`, g('vvl') + g('vvlC'), R.vvlSockel, R.vvlBetrag),
-      mk('dp', `**T-Com Neu/WW DP** (Festnetz NG + Wechsler Neu) von größer Sockel/Einstieg`, g('dp'), R.dpSockel, R.dpBetrag),
-      mk('tp', `**T-Com Neu/WW TP** (Triple Play + Wechsler Neu) von größer Sockel/Einstieg`, g('tp'), R.tpSockel, R.tpBetrag),
-      mk('fnvvl', `**T-Com VVL** (Festnetz VVL & Upgrade) von größer Sockel/Einstieg`, g('fnVvl'), R.fnVvlSockel, R.fnVvlBetrag),
-      mk('zub', `**Zubehör Marge** größer Sockel/Einstieg, gibt ${pf(R.zubAnteil)} Provision`, g('zubMarge'), R.zubSockel, R.zubAnteil, { euro: true, pctBetrag: true, hint: g('zubStk') ? `${g('zubStk')} Stück · Marge über ${eur(R.zubSockel)} × ${pf(R.zubAnteil)}` : undefined }),
-      mk('inst', `je verkauften **Installationsservice** (Voraussetzung: größer 100 Euro)`, g('inst'), 0, R.instBetrag),
-      mk('instvor', `je **Installation Vorort** vom Mitarbeiter (Voraussetzung: größer 100 Euro)`, g('instVor'), 0, R.instVorBetrag),
-      mk('push', `**Company Sonderpush**${String(inp.pushText || '').trim() ? ': ' + String(inp.pushText).trim() : ''}`, null, null, null, { rel: null, aus: g('pushBetrag') }),
+      mk('marge', `**persönliche Marge** ${Math.round(R.margeAnteil * 100)}% von größer Sockel/Einstieg`, marge, R.margeSockel, R.margeAnteil, { euro: true, pctBetrag: true }),
+      mk('neu', `Telekom / Vodafone/ Otelo / O2 **Mobilfunk Neuvertrag** von größer Sockel/Einstieg`, g('po') + g('poC'), R.neuSockel, R.neuBetrag),
+      mk('vvl', `Telekom/ Vodafone /Otelo/ O2 **Mobilfunk VVL** von größer Sockel/Einstieg`, g('vvl') + (R.vvlMitCongstar ? g('vvlC') : 0), R.vvlSockel, R.vvlBetrag),
+      mk('dp', `**Festnetz NG (DP) + Wechsler Neu (DP)** von größer Sockel/Einstieg`, g('dp') + (R.dpMitTp ? g('tp') : 0), R.dpSockel, R.dpBetrag),
+      mk('tp', `**Triple Play + Wechsler Neu (TP)** von größer Sockel/Einstieg`, g('tp'), R.tpSockel, R.tpBetrag),
+      mk('fnvvl', `**Festnetz VVL & Upgrade** von größer Sockel/Einstieg`, g('fnVvl'), R.fnVvlSockel, R.fnVvlBetrag),
+      mk('ks', `**Komplettschutz** größer 25 % von größer Sockel/Einstieg ##(Smartphones ab 150 Euro VK)##`, g('ks'), R.ksSockel, R.ksBetrag),
+      mk('zub', `**Zubehör** Marge größer Sockel/Einstieg, gibt ${Math.round(R.zubAnteil * 100)}% Provision`, g('zubMarge'), R.zubSockel, R.zubAnteil, { euro: true, pctBetrag: true }),
+      mk('inst', `je verkauften **Installationsservice** ##(Voraussetzung: größer 100 Euro)##`, g('inst'), 0, R.instBetrag),
+      mk('instvor', `je **Installation** Vorort vom Mitarbeiter ##(Voraussetzung: größer 100 Euro)##`, g('instVor'), 0, R.instVorBetrag),
+      mk('push', `Company Sonderpush${pushText ? ': ' + pushText : ''}`, pushStk, 0, R.pushEinzel, { aus: pushStk * R.pushEinzel + g('pushBetrag') }),
       mk('abw', `Urlaub/Krankheit`, g('urlaub') + g('krank'), 0, R.abwBetrag)
     ];
     const summe = r2(rows.reduce((s, r) => s + r.aus, 0));
+    const ergIst = has(inp.shopMarge) ? g('shopMarge') : marge;
     const qual = [
-      { row: 'tel', label: 'VVL Telefonie + Abfrage', soll: R.telSoll, ist: g('tel'), rated: has(inp.tel), fmt: 'num' },
-      { row: 'pencil', label: 'Pencil Selling', soll: R.pencilSoll, ist: pct(inp.pencil), rated: has(inp.pencil), fmt: 'pct' },
-      { row: 'werb', label: 'Werbeversprechen', soll: R.werbSoll, ist: pct(inp.werb), rated: has(inp.werb), fmt: 'pct' }
-    ].map(x => { const f = x.ist < x.soll ? -R.abzug : 0; return { ...x, faktor: f, betrag: r2(summe * f) }; });
+      { row: 'tel', label: 'VVL Telefonie + Abfrage', soll: R.telSoll, ist: g('tel'), rated: has(inp.tel), fmt: 'num', rate: R.telAbzug },
+      { row: 'pencil', label: 'Pencil Selling', soll: R.pencilSoll, ist: pct(inp.pencil), rated: has(inp.pencil), fmt: 'pct', rate: R.pencilAbzug, color: true },
+      { row: 'werb', label: 'Werbeversprechen', soll: R.werbSoll, ist: pct(inp.werb), rated: has(inp.werb), fmt: 'pct', rate: R.werbAbzug, color: true },
+      { row: 'int', label: 'Intressentenerfassung', soll: R.intSoll, ist: g('interessenten'), rated: has(inp.interessenten), fmt: 'num', rate: R.intAbzug },
+      { row: 'tvq', label: 'TV Aktivierungsquote', soll: R.tvqSoll, ist: pct(inp.tvq), rated: has(inp.tvq), fmt: 'pct', rate: R.tvqAbzug },
+      { row: 'erg', label: 'Ergebnissicherung', soll: R.ergSoll, ist: ergIst, rated: true, fmt: 'eur', rate: R.ergAbzug, color: true }
+    ].map(x => {
+      const miss = x.ist < x.soll;
+      const f = miss && x.rate > 0 ? -x.rate : 0;
+      return { ...x, miss, faktor: f, betrag: r2(summe * f), optional: !(x.rate > 0) };
+    });
     const korr = GS.map(([k, label]) => {
       const qx = qual.find(x => x.row === k); const ded = -qx.betrag; const mode = inp['gs_' + k];
       let b = 0;
@@ -911,234 +933,298 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
       const band = (ist < ziel ? ist : ziel) - unten, ueber = ist > ziel ? ist - ziel : 0;
       sl = { ziel, ist, quote: ziel > 0 ? ist / ziel : 0, r1, r2: r2_, betrag: ziel > 0 ? r2(Math.max(0, band * r1 + ueber * r2_)) : 0 };
     }
-    const msy = { betrag: 0 };
     const brutto = r2(summe + qual.reduce((s, x) => s + x.betrag, 0) + korr.reduce((s, k) => s + k.betrag, 0) + (sl ? sl.betrag : 0));
     const sonder = { betrag: r2(n(inp.sonderBetrag)), text: String(inp.sonderText || '').trim() };
     const total = r2(Math.max(brutto, R.fix) + sonder.betrag);
+    // Zielpunkte (Info-Tabelle wie Vorlage)
     const ziele = [
-      ['persönliche Marge (Gesamtmarge)', R.zielMarge, marge, true], ['Mobilfunk Neuvertrag gesamt (PO neu gesamt)', R.zielNeu, g('po') + g('poC')],
-      ['Mobilfunk VVL gesamt', R.zielVvl, g('vvl') + g('vvlC')], ['T-Com Neu/WW DP', R.zielDp, g('dp')], ['T-Com Neu/WW TP', R.zielTp, g('tp')],
-      ['T-Com VVL', R.zielFnVvl, g('fnVvl')], ['Zubehör Marge', R.zielZub, g('zubMarge'), true]
-    ].map(([label, ziel, ist, euro]) => ({ label, ziel, ist, euro: !!euro, quote: ziel > 0 ? ist / ziel : 0 }));
-    return { q: {}, rows, summe, qual, msy, korr, sonder, sl, brutto, total, fixGreift: brutto < R.fix, ziele };
+      { label: 'persönliche Marge', ziel: R.zielMarge, ist: marge, euro: true, sum: true },
+      { label: 'Telekom / Vodafone / Otelo / O2 Mobilfunk Neuvertrag', ziel: R.zielNeu, ist: g('po') },
+      { label: 'Congstar Neuvertrag', ziel: R.zielNeuC, ist: g('poC') },
+      { label: 'Telekom / Vodafone / Otelo/ O2  Mobilfunk VVL', ziel: R.zielVvl, ist: g('vvl') },
+      { label: 'Congstar  VVL', ziel: R.zielVvlC, ist: g('vvlC') },
+      { label: 'Festnetz NG (DP) + Wechsler Neu (DP)', ziel: R.zielDp, ist: g('dp') },
+      { label: 'Triple Play + Wechsler Neu (TP)', ziel: R.zielTp, ist: g('tp') },
+      { label: 'Festnetz Neutrale VVL & Upgrade', ziel: R.zielFnVvl, ist: g('fnVvl') },
+      { label: 'Komplettschutz ~~größer 25 %~~ Smartphones ##(Bezugsgröße: Smartphones ab 150 Euro VK)##', ziel: R.zielKs, ist: g('ks') },
+      { label: 'Zubehör Marge größer 50,-€', ziel: R.zielZub, ist: g('zubMarge'), euro: true, marge: true },
+      { label: 'je verkauften Installationsservice (größer 100 Euro)', ziel: R.zielInst, ist: g('inst') },
+      { label: 'je Installation Vorort vom Mitarbeiter (größer 100 Euro)', ziel: R.zielInstVor, ist: g('instVor'), plain: true }
+    ];
+    return { q: {}, rows, summe, qual, msy: { betrag: 0 }, korr, sonder, sl, brutto, total, fixGreift: brutto < R.fix, ziele, firma: FIRMA };
   }
 
-  // ---------- PDF ----------
+  // ---------- PDF (1:1 nach Vorlage „Provisionsabrechnung Fachverkäufer“) ----------
   function buildPdf(jsPDF, inp, R) {
     const res = calc(inp, R);
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-    const GRN = [146, 208, 80], YEL = [255, 255, 0], BLU = [180, 198, 231], WHT = [255, 255, 255], LGR = [242, 242, 242], NAVY = [0, 32, 96];
-    const F = 'helvetica', L = 10, Rr = 200, RH = 5;
-    const box = (x1, y1, x2, y2, fill, lw = 0.15) => { doc.setLineWidth(lw); doc.setDrawColor(0); if (fill) { doc.setFillColor(...fill); doc.rect(x1, y1, x2 - x1, y2 - y1, 'FD'); } else doc.rect(x1, y1, x2 - x1, y2 - y1, 'S'); };
-    const txt = (s, x, y, o = {}) => { doc.setFont(F, o.bold ? 'bold' : 'normal'); doc.setFontSize(o.size || 7.5); doc.setTextColor(...(o.color || [0, 0, 0])); doc.text(String(s), x, y, { align: o.align || 'left' }); };
-    const rich = (s, x, y, maxW, size = 7.5, color = [0, 0, 0]) => {
-      const parts = String(s).split('**');
-      const width = sz => parts.reduce((w, t, i) => { doc.setFont(F, i % 2 ? 'bold' : 'normal'); doc.setFontSize(sz); return w + doc.getTextWidth(t); }, 0);
-      let sz = size; while (width(sz) > maxW && sz > 4.8) sz -= 0.25;
-      let cx = x; parts.forEach((t, i) => { if (!t) return; doc.setFont(F, i % 2 ? 'bold' : 'normal'); doc.setFontSize(sz); doc.setTextColor(...color); const sp0 = sz * 0.278 * 25.4 / 72 * 1.8; doc.text(t.trimStart(), cx + (t.length - t.trimStart().length) * sp0, y); const sp = sz * 0.278 * 25.4 / 72 * 1.8; const lead = t.length - t.trimStart().length, trail = t.length - t.trimEnd().length; cx += doc.getTextWidth(t.trim()) + (lead + trail) * sp; if (lead) {} });
-    };
+    const GRN = [146, 208, 80], YEL = [255, 255, 0], BLU = [141, 180, 226], WHT = [255, 255, 255], GRY = [242, 242, 242], RED = [255, 0, 0], NAVY = [0, 32, 96];
+    const F = 'helvetica', L = 12, Rr = 198;
+    const X = [L, 130, 152, 168, 182, Rr];
     const de = (v, d = 2) => v.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
     const st = v => (Math.round(v * 100) / 100).toLocaleString('de-DE');
-    const acc = (v, x2, y, o = {}) => { const r = Math.round(v * 100) / 100; txt(r === 0 ? '-   €' : (r < 0 ? '- ' : '') + de(Math.abs(r)) + ' €', x2 - 1.2, y, { bold: true, align: 'right', size: o.size || 7.5 }); };
-    const X = [L, 118, 140, 160, 177, Rr]; // Zielpunkt | Erreicht | Sockel | Einzelbetrag | Auszahlung
+    const rect = (x1, y1, x2, y2, fill, lw = 0.12) => { doc.setLineWidth(lw); doc.setDrawColor(0); if (fill) { doc.setFillColor(...fill); doc.rect(x1, y1, x2 - x1, y2 - y1, 'FD'); } else doc.rect(x1, y1, x2 - x1, y2 - y1, 'S'); };
+    const fillOnly = (x1, y1, x2, y2, fill) => { doc.setFillColor(...fill); doc.rect(x1, y1, x2 - x1, y2 - y1, 'F'); };
+    const txt = (s, x, y, o = {}) => { doc.setFont(F, o.bold ? (o.italic ? 'bolditalic' : 'bold') : (o.italic ? 'italic' : 'normal')); doc.setFontSize(o.size || 7); doc.setTextColor(...(o.color || [0, 0, 0])); doc.text(String(s), x, y, { align: o.align || 'left' }); };
+    const ul = (x, y, w, c = [0, 0, 0]) => { doc.setDrawColor(...c); doc.setLineWidth(0.15); doc.line(x, y + 0.5, x + w, y + 0.5); doc.setDrawColor(0); };
+    // **fett+unterstrichen**, ##klein##, ~~rot fett~~
+    const rich = (s, x, y, maxW, size = 7, color = [0, 0, 0]) => {
+      const parts = []; const re = /(\*\*[^*]+\*\*|##[^#]+##|~~[^~]+~~)/g; let last = 0, m;
+      while ((m = re.exec(s))) { if (m.index > last) parts.push([s.slice(last, m.index), 'n']); const t = m[0]; parts.push([t.slice(2, -2), t[0] === '*' ? 'b' : t[0] === '#' ? 's' : 'r']); last = re.lastIndex; }
+      if (last < s.length) parts.push([s.slice(last), 'n']);
+      const set = (k, sz) => { doc.setFont(F, k === 'b' || k === 'r' ? 'bold' : 'normal'); doc.setFontSize(k === 's' ? sz * 0.8 : sz); };
+      const tw = t => { const sp = (doc.getTextWidth('a a') - doc.getTextWidth('aa')) * 1.6; const lead = t.length - t.trimStart().length, trail = t.length - t.trimEnd().length; return (t.trim() ? doc.getTextWidth(t.trim()) : 0) + (t.trim() ? lead + trail : t.length) * sp; };
+      const width = sz => parts.reduce((w, [t, k]) => { set(k, sz); return w + tw(t); }, 0);
+      let sz = size; while (width(sz) > maxW && sz > 4.5) sz -= 0.25;
+      let cx = x;
+      parts.forEach(([t, k]) => { set(k, sz); doc.setTextColor(...(k === 'r' ? RED : color)); const sp = (doc.getTextWidth('a a') - doc.getTextWidth('aa')) * 1.6; const lead = (t.length - t.trimStart().length) * sp; if (t.trim()) doc.text(t.trim(), cx + lead, y); if (k === 'b' && t.trim()) ul(cx + lead, y, doc.getTextWidth(t.trim()), color); cx += tw(t); });
+    };
+    const acc = (v, x2, y, o = {}) => { const r = Math.round(v * 100) / 100; txt(r === 0 ? '-   €' : (r < 0 ? '- ' : '') + de(Math.abs(r)) + ' €', x2 - 1, y, { bold: true, align: 'right', size: o.size || 7 }); };
+    const name = inp.vollerName || inp.name || '';
 
-    // Kopf (grün)
-    box(L, 12, Rr, 31, GRN, 0.3);
-    txt('Provisionsabrechnung Fachverkäufer', L + 1.5, 18.5, { bold: true, size: 14 });
-    txt('Vorname/Name:', L + 1.5, 23, { size: 6.5 }); txt('Monat:', Rr - 2, 23, { size: 6.5, align: 'right' });
-    txt(inp.vollerName || inp.name || '', L + 1.5, 28.5, { bold: true, size: 12 }); txt(inp.monat || '', Rr - 2, 28.5, { bold: true, size: 12, align: 'right' });
+    // ---- Kopf (grün)
+    let y = 12;
+    rect(L, y, Rr, y + 15, GRN, 0.25);
+    txt('Provisionsabrechnung Fachverkäufer', L + 0.8, y + 4.2, { bold: true, size: 10 });
+    txt('Vorname/Name:', L + 0.8, y + 8.2, { size: 6.5 });
+    txt('Monat:', 178, y + 8.6, { size: 6.5 });
+    txt(name, L + 0.8, y + 13, { bold: true, size: 10 });
+    txt(inp.monat || '', 176, y + 13, { bold: true, size: 10 });
 
-    // Zielpunkte (Info)
-    let y = 37;
-    txt('Zielpunkte' + (inp.standort ? ' ' + inp.standort : ''), L, y, { bold: true, size: 10 });
-    y += 1.5;
-    const ZX = [L, 140, 160, 180, Rr];
-    box(ZX[0], y, ZX[1], y + 4.2, LGR); box(ZX[1], y, ZX[2], y + 4.2, LGR); box(ZX[2], y, ZX[3], y + 4.2, BLU); box(ZX[3], y, ZX[4], y + 4.2, LGR);
-    txt('Ziele', (ZX[1] + ZX[2]) / 2, y + 3, { bold: true, size: 6.5, align: 'center' }); txt('IST', (ZX[2] + ZX[3]) / 2, y + 3, { bold: true, size: 6.5, align: 'center' }); txt('Erreichung', (ZX[3] + ZX[4]) / 2, y + 3, { bold: true, size: 6.5, align: 'center' });
-    y += 4.2;
+    // ---- Zielpunkte
+    y = 31;
+    const RHz = 3.55;
+    rect(L, y, X[1], y + 4.6); rect(X[1], y, X[2], y + 4.6); rect(X[2], y, X[3], y + 4.6, BLU); rect(X[3], y, X[4], y + 4.6); rect(X[4], y, X[5], y + 4.6);
+    txt('Zielpunkte ' + (inp.standort || 'Telekom Partner'), L + 0.6, y + 3.5, { bold: true, size: 9.5 });
+    txt('Ziele', (X[1] + X[2]) / 2, y + 3.3, { size: 6, align: 'center' });
+    txt('IST ("Eingabereich")', (X[2] + X[3]) / 2, y + 3.1, { size: 4.2, align: 'center' });
+    txt('Zielmarge', (X[3] + X[4]) / 2, y + 3.3, { size: 6, align: 'center' });
+    txt('IST Marge', (X[4] + X[5]) / 2, y + 3.3, { size: 6, align: 'center' });
+    y += 4.6;
+    const zubZ = res.ziele.find(z => z.marge);
     res.ziele.forEach(z => {
-      box(ZX[0], y, ZX[1], y + 3.9); box(ZX[1], y, ZX[2], y + 3.9); box(ZX[2], y, ZX[3], y + 3.9, BLU); box(ZX[3], y, ZX[4], y + 3.9);
-      txt(z.label, L + 0.8, y + 2.8, { size: 6.5 });
-      txt(z.euro ? de(z.ziel) + ' €' : st(z.ziel), ZX[2] - 1, y + 2.8, { size: 6.5, align: 'right' });
-      txt(z.euro ? de(z.ist) + ' €' : st(z.ist), ZX[3] - 1, y + 2.8, { size: 6.5, align: 'right' });
-      txt(z.ziel > 0 ? Math.round(z.quote * 100) + ' %' : '–', ZX[4] - 1, y + 2.8, { size: 6.5, align: 'right', bold: z.ziel > 0 && z.quote >= 1, color: z.ziel > 0 && z.quote >= 1 ? [14, 122, 75] : [0, 0, 0] });
-      y += 3.9;
+      const b = y + RHz - 0.9;
+      rect(L, y, X[1], y + RHz); rect(X[1], y, X[2], y + RHz); rect(X[2], y, X[3], y + RHz, BLU); rect(X[3], y, X[4], y + RHz); rect(X[4], y, X[5], y + RHz);
+      rich(z.label, L + 0.5, b, X[1] - L - 1, 6);
+      const v = (val, euro) => euro ? de(val) + ' €' : st(val);
+      txt(v(z.ziel, z.euro), z.euro ? X[2] - 0.8 : (X[1] + X[2]) / 2, b, { size: 6, align: z.euro ? 'right' : 'center' });
+      txt(v(z.ist, z.euro), z.euro ? X[3] - 0.8 : (X[2] + X[3]) / 2, b, { size: 6, align: z.euro ? 'right' : 'center' });
+      if (z.plain) { txt('0', (X[3] + X[4]) / 2, b, { size: 6, align: 'center' }); txt('0', X[5] - 0.8, b, { size: 6, align: 'right' }); }
+      else if (z.sum || z.marge) { txt(de(zubZ.ziel) + ' €', X[4] - 0.8, b, { size: 6, align: 'right' }); txt(de(zubZ.ist) + ' €', X[5] - 0.8, b, { size: 6, align: 'right' }); }
+      else { txt('-   €', X[4] - 0.8, b, { size: 6, align: 'right' }); txt('-   €', X[5] - 0.8, b, { size: 6, align: 'right' }); }
+      y += RHz;
     });
+    rect(L, y, X[1], y + RHz); rect(X[1], y, X[2], y + RHz); rect(X[2], y, X[3], y + RHz, BLU); rect(X[3], y, X[4], y + RHz); rect(X[4], y, X[5], y + RHz);
+    txt('Summe', L + 0.5, y + RHz - 1, { size: 4.8 });
+    y += RHz + 4;
 
-    // Berechnung Provisionen (grün)
-    y += 4;
-    txt('Berechnung Provisionen:', L, y, { bold: true, size: 10 }); txt('(zielrelevant: gesamte Performance des Mitarbeiters, egal in welchem Shop)', L + 45, y, { size: 6.5 });
-    y += 1.5;
-    const hh = 8;
-    ['Zielpunkt/Aktionen', 'Erreichte Stücke/Margen', 'Sockel/Einstieg', 'Einzelbetrag', 'Auszahlung'].forEach((h, i) => {
-      box(X[i], y, X[i + 1], y + hh, GRN);
-      const ls = doc.splitTextToSize(h, X[i + 1] - X[i] - 2);
-      ls.forEach((l, k) => txt(l, i ? (X[i] + X[i + 1]) / 2 : X[i] + 0.8, y + 3.2 + k * 2.8, { bold: true, size: 6.5, align: i ? 'center' : 'left' }));
+    // ---- Berechnung Provisionen (grün)
+    const RH = 3.85;
+    ['Zielpunkt/Aktionen', 'Erreichte', 'Sockel /', 'Einzelbetrag', 'Auszahlung'].forEach((h, i) => {
+      rect(X[i], y, X[i + 1], y + RH, GRN);
+      txt(h, i ? (X[i] + X[i + 1]) / 2 : X[i] + 0.5, y + RH - 1, { bold: true, size: 6.3, align: i ? 'center' : 'left' });
     });
-    y += hh;
+    y += RH;
     res.rows.forEach(r => {
-      const b = y + RH - 1.4;
-      box(X[0], y, X[1], y + RH, GRN); rich(r.rich, X[0] + 0.8, b, X[1] - X[0] - 1.6, 7.2);
-      box(X[1], y, X[2], y + RH, GRN); box(X[2], y, X[3], y + RH, GRN); box(X[3], y, X[4], y + RH, GRN); box(X[4], y, X[5], y + RH, WHT);
-      if (r.row !== 'push') {
-        txt(r.euro ? de(r.ist) + ' €' : st(r.ist), X[1] + 1, b, { size: 7 });
-        txt(r.euro ? de(r.sockel) + ' €' : st(r.sockel), X[2] + 1, b, { size: 7 });
-        txt(r.pctBetrag ? Math.round(r.betrag * 100) + '%' : de(r.betrag) + ' €', X[4] - 1, b, { size: 7, align: 'right' });
-      }
-      acc(r.aus, X[5], b);
+      const b = y + RH - 1;
+      for (let i = 0; i < 5; i++) rect(X[i], y, X[i + 1], y + RH, GRN);
+      rich(r.rich, X[0] + 0.5, b, X[1] - X[0] - 1, 6.8);
+      txt(r.euro ? de(r.ist) + ' €' : st(r.ist), r.euro ? X[2] - 0.8 : (X[1] + X[2]) / 2, b, { size: 6.5, align: r.euro ? 'right' : 'center' });
+      txt(r.euro ? de(r.sockel) + ' €' : st(r.sockel), r.euro ? X[3] - 0.8 : (X[2] + X[3]) / 2, b, { size: 6.5, align: r.euro ? 'right' : 'center' });
+      if (r.pctBetrag) txt(Math.round(r.betrag * 100) + '%', X[3] + 1, b, { size: 6.5 });
+      else txt(de(r.betrag) + ' €', X[4] - 0.8, b, { size: 6.5, align: 'right' });
+      if (!(r.row === 'push' && !r.aus)) acc(r.aus, X[5], b, { size: 6.8 });
       y += RH;
     });
-    box(X[0], y, X[4], y + 6.5, GRN); box(X[4], y, X[5], y + 6.5, GRN);
-    txt('potentieller Auszahlungsbetrag', X[0] + 0.8, y + 4.8, { bold: true, size: 10 });
-    acc(res.summe, X[5], y + 4.8, { size: 9.5 });
-    doc.setLineWidth(0.5); doc.line(X[0], y + 6.5, X[5], y + 6.5);
-    y += 6.5;
+    rect(X[0], y, X[5], y + RH, GRN); y += RH;
+    fillOnly(X[0], y, X[5], y + 4.6, GRN);
+    txt('potentieller Auszahlungsbetrag', X[0] + 0.5, y + 3.9, { bold: true, size: 9.5 });
+    acc(res.summe, X[5], y + 3.9, { size: 9.5 });
+    y += 4.6 + 2;
     if (res.sl) {
-      box(X[0], y, X[4], y + RH, YEL); rich(`**Shopleiter-Provision** Marge: Ziel ${de(res.sl.ziel)} € · Ist ${de(res.sl.ist)} € · ${pf(res.sl.quote)}`, X[0] + 0.8, y + RH - 1.4, X[4] - X[0] - 2);
-      box(X[4], y, X[5], y + RH, WHT); acc(res.sl.betrag, X[5], y + RH - 1.4); y += RH;
+      rect(X[0], y, X[4], y + RH, GRN); rect(X[4], y, X[5], y + RH, GRN);
+      rich(`**Shopleiter-Provision** Marge: Ziel ${de(res.sl.ziel)} € · Ist ${de(res.sl.ist)} € · ${pf(res.sl.quote)}`, X[0] + 0.5, y + RH - 1, X[4] - X[0] - 1, 6.8);
+      acc(res.sl.betrag, X[5], y + RH - 1, { size: 6.8 }); y += RH + 2;
     }
 
-    // Qualitätssicherung (gelb)
-    y += 3;
-    const QX = [L, 118, 140, 160, 177, Rr];
-    box(QX[0], y, QX[1], y + 6, YEL); txt('Qualitätssicherung', QX[0] + 0.8, y + 4.3, { bold: true, size: 10 });
-    box(QX[1], y, QX[2], y + 6, YEL); txt('Soll', (QX[1] + QX[2]) / 2, y + 4.2, { bold: true, size: 8, align: 'center' });
-    box(QX[2], y, QX[3], y + 6, YEL); txt('Ist', (QX[2] + QX[3]) / 2, y + 4.2, { bold: true, size: 8, align: 'center' });
-    box(QX[3], y, QX[4], y + 6, YEL); txt('Malus', (QX[3] + QX[4]) / 2, y + 4.2, { bold: true, size: 8, align: 'center' });
-    box(QX[4], y, QX[5], y + 6, YEL);
-    y += 6;
-    const qv = (x, v) => x.fmt === 'pct' ? Math.round(v * 100) + '%' : x.fmt === 'eur' ? de(v, 0) + ' €' : st(v);
+    // ---- Qualitätssicherung (gelb)
+    const RQ = 4.1;
+    fillOnly(X[0], y, X[5], y + 6, YEL);
+    txt('Qualitätssicherung', X[0] + 0.8, y + 4.4, { bold: true, size: 10.5 });
+    doc.setFont(F, 'bold'); doc.setFontSize(10.5); ul(X[0] + 0.8, y + 4.4, doc.getTextWidth('Qualitätssicherung'));
+    txt('Soll', (X[1] + X[2]) / 2, y + 4.2, { bold: true, size: 8, align: 'center' });
+    txt('Ist', (X[2] + X[3]) / 2, y + 4.2, { bold: true, size: 8, align: 'center' });
+    y += 6; fillOnly(X[0], y, X[5], y + 3, YEL); y += 3;
+    const qv = (x, v) => x.fmt === 'pct' ? Math.round(v * 100) + '%' : x.fmt === 'eur' ? de(v) + ' €' : st(v);
     res.qual.forEach(x => {
-      const b = y + RH - 1.4;
-      [0, 1, 2, 3].forEach(i => box(QX[i], y, QX[i + 1], y + RH, YEL)); box(QX[4], y, QX[5], y + RH, WHT);
-      rich(x.label, QX[0] + 0.8, b, QX[1] - QX[0] - 1.6, 7.2);
-      txt(qv(x, x.soll), (QX[1] + QX[2]) / 2, b, { size: 7, align: 'center' });
-      const bad = x.faktor < 0;
-      txt(x.rated ? qv(x, x.ist) : 'fehlt', (QX[2] + QX[3]) / 2, b, { size: 7, align: 'center', color: bad ? [194, 54, 43] : [0, 0, 0], bold: bad });
-      txt(Math.round(x.faktor * 100) + '%', QX[4] - 1, b, { size: 7, align: 'right' });
-      acc(x.betrag, QX[5], b);
-      y += RH;
+      const b = y + RQ - 1.1;
+      for (let i = 0; i < 5; i++) rect(X[i], y, X[i + 1], y + RQ, YEL);
+      if (x.color && x.rated) rect(X[2], y, X[3], y + RQ, x.miss ? RED : GRN);
+      txt(x.label, X[0] + 0.5, b, { size: 6.8 });
+      txt(qv(x, x.soll), (X[1] + X[2]) / 2, b, { size: 6.5, align: 'center' });
+      txt(x.rated ? qv(x, x.ist) : 'fehlt', (X[2] + X[3]) / 2, b, { size: 6.5, align: 'center', color: x.color && x.miss ? [120, 0, 0] : [0, 0, 0] });
+      txt(Math.round(x.rate * 1000) / 10 + '%', (X[3] + X[4]) / 2, b, { size: 6.5, align: 'center' });
+      if (x.rate > 0 || x.betrag) acc(x.betrag, X[5], b, { size: 6.8 });
+      y += RQ;
     });
-    res.korr.forEach(k => {
-      if (!k.betrag && k.key !== 'sonst') return;
-      if (!k.betrag) return;
-      const b = y + RH - 1.4;
-      box(QX[0], y, QX[4], y + RH, YEL); rich(k.label + (k.note ? '  **' + k.note + '**' : ''), QX[0] + 0.8, b, QX[4] - QX[0] - 1.6, 7.2);
-      box(QX[4], y, QX[5], y + RH, WHT); acc(k.betrag, QX[5], b); y += RH;
+    res.korr.filter(k => k.betrag).forEach(k => {
+      const b = y + RQ - 1.1;
+      rect(X[0], y, X[4], y + RQ, YEL); rect(X[4], y, X[5], y + RQ, YEL);
+      rich(k.label + (k.note ? '  ' + k.note : ''), X[0] + 0.5, b, X[4] - X[0] - 1, 6.8);
+      acc(k.betrag, X[5], b, { size: 6.8 }); y += RQ;
     });
     if (res.sonder.betrag) {
-      const b = y + RH - 1.4;
-      box(QX[0], y, QX[4], y + RH, YEL); rich('**Sonderprovision**' + (res.sonder.text ? ': ' + res.sonder.text : ''), QX[0] + 0.8, b, QX[4] - QX[0] - 1.6, 7.2);
-      box(QX[4], y, QX[5], y + RH, WHT); acc(res.sonder.betrag, QX[5], b); y += RH;
+      const b = y + RQ - 1.1;
+      rect(X[0], y, X[4], y + RQ, YEL); rect(X[4], y, X[5], y + RQ, YEL);
+      rich('**Sonderprovision**' + (res.sonder.text ? ': ' + res.sonder.text : ''), X[0] + 0.5, b, X[4] - X[0] - 1, 6.8);
+      acc(res.sonder.betrag, X[5], b, { size: 6.8 }); y += RQ;
     }
-    txt(`Provisionsabsicherung ${de(R.fix, 0)},- €`, L, y + 3.5, { size: 6.5 });
+    txt(`Provisionsabsicherung ${de(R.fix, 0)},-€`, X[0] + 2, y + 2.8, { size: 6.5, color: NAVY });
+    y += 3.8;
 
-    // Auszahlungsbetrag (grün)
-    y += 6;
-    const gy = y, gh = 19;
-    box(L, gy, Rr, gy + gh, GRN, 0.3);
-    doc.setLineWidth(0.15); doc.line(L, gy + gh - 3.5, Rr, gy + gh - 3.5);
-    txt('Auszahlungsbetrag', L + 1.5, gy + 6, { bold: true, size: 12 });
-    txt(inp.monat || '', 150, gy + 6, { bold: true, size: 10 });
-    doc.setLineWidth(0.25); doc.line(150, gy + 6.7, 150 + doc.getTextWidth(inp.monat || ''), gy + 6.7);
-    const totS = de(res.total) + ' €';
-    txt(totS, Rr - 2, gy + 6, { bold: true, size: 12, align: 'right' });
-    doc.setFont(F, 'bold'); doc.setFontSize(12);
-    const ux = Rr - 3 - doc.getTextWidth(totS);
-    doc.line(ux, gy + 7, Rr - 2, gy + 7); doc.line(ux, gy + 7.6, Rr - 2, gy + 7.6);
-    if (res.fixGreift) txt(`Provisionsabsicherung greift (berechnet ${eur(res.brutto)})`, Rr - 2, gy + 10.5, { size: 6, align: 'right' });
-    txt('Datum & Unterschrift Mitarbeiter', L + 1.5, gy + gh - 1, { size: 6.5 });
-    txt('Datum & Unterschrift Vorgesetzter', 110, gy + gh - 1, { size: 6.5 });
+    // ---- Auszahlungsbetrag (grün)
+    const gh = 15;
+    rect(X[0], y, X[5], y + gh, GRN, 0.25);
+    doc.setLineWidth(0.12); doc.line(X[0], y + gh - 3, X[5], y + gh - 3);
+    txt('Auszahlungsbetrag', X[0] + 0.6, y + 4.3, { bold: true, size: 10.5 });
+    doc.setFont(F, 'bold'); doc.setFontSize(10.5); ul(X[0] + 0.6, y + 4.3, doc.getTextWidth('Auszahlungsbetrag'));
+    txt(inp.monat || '', 156, y + 4.6, { bold: true, size: 8.5 });
+    doc.setFont(F, 'bold'); doc.setFontSize(8.5); ul(156, y + 4.6, doc.getTextWidth(inp.monat || ''));
+    { const s = de(res.total) + ' €'; txt(s, X[5] - 2, y + 4.6, { bold: true, size: 10, align: 'right' }); doc.setFont(F, 'bold'); doc.setFontSize(10); const w = doc.getTextWidth(s); ul(X[5] - 2 - w, y + 4.8, w); }
+    if (res.fixGreift) txt(`(berechnet ${eur(res.brutto)} – Provisionsabsicherung greift)`, X[5] - 2, y + 8, { size: 5.5, align: 'right' });
+    txt('Datum & Unterschrift Mitarbeiter', X[0] + 0.6, y + gh - 0.8, { size: 5.5 });
+    txt('& Unterschrift Vorgesetzter', 120, y + gh - 0.8, { size: 5.5 });
+    y += gh;
+    txt('Sicherungsprovision', X[0] + 0.6, y + 2.5, { size: 5.5 });
+    txt(de(R.fix) + ' €', X[4] + 3, y + 2.6, { bold: true, italic: true, size: 6.5 });
+    y += 3.6;
 
-    // Seite 2: Regularien
+    // ---- Regularien-Boxen (grau)
     const reg = regularien(R);
-    doc.addPage();
-    let ry = 18;
-    const section = (title, lines, boldFirst) => {
-      txt(title, L, ry, { bold: true, size: 12, color: NAVY }); doc.setDrawColor(...NAVY); doc.setLineWidth(0.3); doc.line(L, ry + 1, L + doc.getTextWidth(title), ry + 1); doc.setDrawColor(0);
-      ry += 6;
-      lines.forEach(t => {
-        doc.setFont(F, 'normal'); doc.setFontSize(8.5); doc.setTextColor(...NAVY);
-        const ls = doc.splitTextToSize('• ' + t, Rr - L - 2);
-        doc.text(ls, L + 1, ry); ry += ls.length * 3.8 + 1.2;
-      });
-      ry += 4;
+    const LH = 2.55, FS = 5.2;
+    const box = (title, sub, lines, render) => {
+      let h = 6.5 + lines.length * LH + 1.2;
+      if (y + h > 290) { doc.addPage(); y = 14; }
+      rect(X[0], y, X[5], y + h, GRY, 0.2);
+      txt(title, X[0] + 0.8, y + 4.6, { bold: true, size: 10, color: NAVY });
+      doc.setFont(F, 'bold'); doc.setFontSize(10); const tw = doc.getTextWidth(title); ul(X[0] + 0.8, y + 4.6, tw, NAVY);
+      if (sub) txt(sub, X[0] + 1.6 + tw, y + 4.6, { size: 5.5, color: NAVY });
+      let ly = y + 6.5 + LH - 0.4;
+      lines.forEach(l => { render(l, ly); ly += LH; });
+      y += h + 1.6;
     };
-    section('Qualitätssicherung durch Malusregelungen auf den potentiellen Auszahlungsbetrag', reg.malus);
-    section('Prozess Abrechnung', reg.prozess);
-    section('Spielregeln Provisionsvereinbarung', reg.spielregeln);
-    txt(`Bestimmt für: ${inp.vollerName || inp.name || ''}`, L, ry + 2, { size: 8, color: NAVY, bold: true });
+    box('Qualitätssicherung', 'durch Malusregelungen auf potentiellen Auszahlungsauftrag', reg.malus, ([lead, rest], ly) => {
+      let cx = X[0] + 0.8;
+      if (lead) { txt(lead, cx, ly, { bold: true, size: FS, color: NAVY }); doc.setFont(F, 'bold'); doc.setFontSize(FS); const w = doc.getTextWidth(lead); ul(cx, ly, w, NAVY); cx += w; }
+      if (rest) txt(rest, cx, ly, { size: FS, color: NAVY });
+    });
+    box('Prozess Abrechnung:', '', reg.prozess, (l, ly) => { if (l) txt(l, X[0] + 0.8, ly, { size: FS - 0.3 }); });
+    box('Spielregeln Provisionsvereinbarung', '', reg.spielregeln(name), (l, ly) => { if (l) txt(l, X[0] + 0.8, ly, { size: FS - 0.3 }); });
 
     addZusatz(doc, inp, res);
     if (res.sonder.betrag) addSonder(doc, inp, res);
     return doc;
   }
 
-  // ---------- Excel ----------
+  // ---------- Excel (gleiches Layout, mit Formeln) ----------
   async function buildXlsx(ExcelJS, _u, inp, R) {
     const res = calc(inp, R);
     const wb = new ExcelJS.Workbook(); wb.calcProperties = { fullCalcOnLoad: true };
-    const ws = wb.addWorksheet('Provisionsabrechnung', { pageSetup: { paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 }, views: [{ showGridLines: false }] });
-    ws.columns = [{ width: 80 }, { width: 16 }, { width: 16 }, { width: 14 }, { width: 18 }];
+    const ws = wb.addWorksheet('Provisionsabrechnung', { pageSetup: { paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.4, right: 0.4, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } }, views: [{ showGridLines: false }] });
+    ws.columns = [{ width: 92 }, { width: 16 }, { width: 16 }, { width: 14 }, { width: 18 }];
     const thin = { style: 'thin', color: { argb: 'FF000000' } };
-    const FILL = { g: 'FF92D050', y: 'FFFFFF00', b: 'FFB4C6E7', w: 'FFFFFFFF', l: 'FFF2F2F2' };
+    const FILL = { g: 'FF92D050', y: 'FFFFFF00', b: 'FF8DB4E2', w: 'FFFFFFFF', l: 'FFF2F2F2', r: 'FFFF0000' };
     const EUR = '#,##0.00 "€"', ACC = '_-* #,##0.00 "€"_-;-* #,##0.00 "€"_-;_-* "-"?? "€"_-;_-@_-';
-    const cell = (a, v, o = {}) => { const c = ws.getCell(a); if (v !== undefined) c.value = v; c.font = { name: 'Calibri', size: o.size || 11, bold: !!o.bold, color: { argb: o.color || 'FF000000' } };
-      if (o.fill) { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: FILL[o.fill] } }; if (o.border !== false) c.border = { top: thin, left: thin, bottom: thin, right: thin }; }
+    const cell = (a, v, o = {}) => { const c = ws.getCell(a); if (v !== undefined) c.value = v; c.font = { name: 'Calibri', size: o.size || 11, bold: !!o.bold, italic: !!o.italic, underline: o.underline, color: { argb: o.color || 'FF000000' } };
+      if (o.fill) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: FILL[o.fill] } };
+      if (o.border) c.border = { top: thin, left: thin, bottom: thin, right: thin };
       if (o.fmt) c.numFmt = o.fmt; c.alignment = { vertical: 'middle', horizontal: o.h, wrapText: !!o.wrap }; return c; };
     const fx = (formula, result) => ({ formula, result });
-    'ABCDE'.split('').forEach(c => { cell(c + '1', undefined, { fill: 'g', border: false }); cell(c + '2', undefined, { fill: 'g', border: false }); cell(c + '3', undefined, { fill: 'g', border: false }); });
-    cell('A1', 'Provisionsabrechnung Fachverkäufer', { fill: 'g', bold: true, size: 18, border: false });
-    cell('A2', 'Vorname/Name:', { fill: 'g', size: 9, border: false }); cell('E2', 'Monat:', { fill: 'g', size: 9, border: false, h: 'right' });
-    cell('A3', inp.vollerName || inp.name || '', { fill: 'g', bold: true, size: 16, border: false }); cell('E3', inp.monat || '', { fill: 'g', bold: true, size: 16, border: false, h: 'right' });
+    const name = inp.vollerName || inp.name || '';
+    const row5 = (r, f, b = true) => 'ABCDE'.split('').forEach(c => cell(c + r, undefined, { fill: f, border: b }));
+    // Kopf
+    [1, 2, 3].forEach(r => row5(r, 'g', false));
+    cell('A1', 'Provisionsabrechnung Fachverkäufer', { fill: 'g', bold: true, size: 14 });
+    cell('A2', 'Vorname/Name:', { fill: 'g', size: 9 }); cell('E2', 'Monat:', { fill: 'g', size: 9 });
+    cell('A3', name, { fill: 'g', bold: true, size: 14 }); cell('E3', inp.monat || '', { fill: 'g', bold: true, size: 14 });
+    // Zielpunkte
     let r = 5;
-    cell('A' + r, 'Zielpunkte' + (inp.standort ? ' ' + inp.standort : ''), { bold: true, size: 14 }); cell('B' + r, 'Ziele', { bold: true, fill: 'l', h: 'center' }); cell('C' + r, 'IST', { bold: true, fill: 'b', h: 'center' }); cell('D' + r, 'Erreichung', { bold: true, fill: 'l', h: 'center' }); r++;
-    res.ziele.forEach(z => { cell('A' + r, z.label, { fill: 'w' }); cell('B' + r, z.ziel, { fill: 'w', fmt: z.euro ? EUR : '0' }); cell('C' + r, z.ist, { fill: 'b', fmt: z.euro ? EUR : '0' }); cell('D' + r, fx(`IF(B${r}>0,C${r}/B${r},"")`, z.ziel > 0 ? z.quote : ''), { fill: 'w', fmt: '0%' }); r++; });
+    row5(r, 'w'); cell('A' + r, 'Zielpunkte ' + (inp.standort || 'Telekom Partner'), { bold: true, size: 14, border: true });
+    cell('B' + r, 'Ziele', { border: true, h: 'center', size: 9 }); cell('C' + r, 'IST ("Eingabereich")', { fill: 'b', border: true, h: 'center', size: 8 });
+    cell('D' + r, 'Zielmarge', { border: true, h: 'center', size: 9 }); cell('E' + r, 'IST Marge', { border: true, h: 'center', size: 9 }); r++;
+    const zStart = r; let zubRow = 0;
+    res.ziele.forEach(z => { if (z.marge) zubRow = zStart + res.ziele.indexOf(z); });
+    res.ziele.forEach(z => {
+      row5(r, 'w');
+      cell('A' + r, strip(z.label).replace(/##|~~/g, ''), { border: true, size: 10 });
+      cell('B' + r, z.ziel, { border: true, fmt: z.euro ? EUR : '0', h: 'center' });
+      cell('C' + r, z.ist, { fill: 'b', border: true, fmt: z.euro ? EUR : '0', h: 'center' });
+      if (z.sum) { cell('D' + r, fx(`D${zubRow}`, R.zielZub), { border: true, fmt: ACC }); cell('E' + r, fx(`E${zubRow}`, res.ziele.find(q => q.marge).ist), { border: true, fmt: ACC }); }
+      else if (z.marge) { cell('D' + r, fx(`B${r}`, z.ziel), { border: true, fmt: ACC }); cell('E' + r, fx(`C${r}`, z.ist), { border: true, fmt: ACC }); }
+      else { cell('D' + r, 0, { border: true, fmt: ACC }); cell('E' + r, 0, { border: true, fmt: ACC }); }
+      r++;
+    });
+    row5(r, 'w'); cell('C' + r, null, { fill: 'b', border: true }); cell('A' + r, 'Summe', { border: true, size: 8 }); r += 2;
+    // Berechnung
+    ['Zielpunkt/Aktionen', 'Erreichte Stücke/Margen', 'Sockel / Einstieg', 'Einzelbetrag', 'Auszahlung'].forEach((h, i) => cell(String.fromCharCode(65 + i) + r, h, { bold: true, fill: 'g', border: true, h: i ? 'center' : 'left' }));
     r++;
-    cell('A' + r, 'Berechnung Provisionen: (zielrelevant gesamte Performance Mitarbeiter egal in welchem Shop)', { bold: true, size: 12 }); r++;
-    ['Zielpunkt/Aktionen', 'Erreichte Stücke/Margen', 'Sockel / Einstieg', 'Einzelbetrag', 'Auszahlung'].forEach((h, i) => cell(String.fromCharCode(65 + i) + r, h, { bold: true, fill: 'g', wrap: true, h: i ? 'center' : 'left' }));
-    ws.getRow(r).height = 32; r++;
     const first = r;
     res.rows.forEach(x => {
-      cell('A' + r, strip(x.rich), { fill: 'g' });
-      if (x.row === 'push') { ['B', 'C', 'D'].forEach(c => cell(c + r, null, { fill: 'g' })); cell('E' + r, x.aus || 0, { fill: 'w', bold: true, fmt: ACC }); }
-      else {
-        cell('B' + r, x.ist, { fill: 'g', fmt: x.euro ? EUR : '0' }); cell('C' + r, x.sockel, { fill: 'g', fmt: x.euro ? EUR : '0' }); cell('D' + r, x.betrag, { fill: 'g', fmt: x.pctBetrag ? '0%' : EUR });
-        const formula = `MAX(0,B${r}-C${r})*D${r}`;
-        cell('E' + r, fx(formula, x.aus), { fill: 'w', bold: true, fmt: ACC });
-      }
+      row5(r, 'g');
+      cell('A' + r, strip(x.rich).replace(/##/g, ''), { fill: 'g', border: true });
+      cell('B' + r, x.ist, { fill: 'g', border: true, fmt: x.euro ? EUR : '0', h: 'center' });
+      cell('C' + r, x.sockel, { fill: 'g', border: true, fmt: x.euro ? EUR : '0', h: 'center' });
+      cell('D' + r, x.betrag, { fill: 'g', border: true, fmt: x.pctBetrag ? '0%' : EUR });
+      const extra = x.row === 'push' && n(inp.pushBetrag) ? '+' + n(inp.pushBetrag) : '';
+      cell('E' + r, fx(`MAX(0,B${r}-C${r})*D${r}${extra}`, x.aus), { fill: 'g', border: true, bold: true, fmt: ACC });
       r++;
     });
+    row5(r, 'g'); r++;
     const rSum = r;
-    'ABCD'.split('').forEach(c => cell(c + r, null, { fill: 'g' }));
-    cell('A' + r, 'potentieller Auszahlungsbetrag', { fill: 'g', bold: true, size: 14 }); cell('E' + r, fx(`SUM(E${first}:E${r - 1})`, res.summe), { fill: 'g', bold: true, size: 13, fmt: ACC }); r++;
+    row5(r, 'g', false);
+    cell('A' + r, 'potentieller Auszahlungsbetrag', { fill: 'g', bold: true, size: 14 });
+    cell('E' + r, fx(`SUM(E${first}:E${r - 2})`, res.summe), { fill: 'g', bold: true, size: 14, fmt: ACC }); r += 2;
     const add = [];
-    if (res.sl) { cell('A' + r, `Shopleiter-Provision Marge: Ziel ${eur(res.sl.ziel)} · Ist ${eur(res.sl.ist)} · ${pf(res.sl.quote)}`, { fill: 'y', bold: true }); 'BCD'.split('').forEach(c => cell(c + r, null, { fill: 'y' })); cell('E' + r, res.sl.betrag, { fill: 'w', bold: true, fmt: ACC }); add.push('E' + r); r++; }
-    r++;
-    cell('A' + r, 'Qualitätssicherung', { fill: 'y', bold: true, size: 14 }); cell('B' + r, 'Soll', { fill: 'y', bold: true, h: 'center' }); cell('C' + r, 'Ist', { fill: 'y', bold: true, h: 'center' }); cell('D' + r, 'Malus', { fill: 'y', bold: true, h: 'center' }); cell('E' + r, null, { fill: 'y' }); r++;
+    if (res.sl) { row5(r, 'g'); cell('A' + r, `Shopleiter-Provision Marge: Ziel ${eur(res.sl.ziel)} · Ist ${eur(res.sl.ist)} · ${pf(res.sl.quote)}`, { fill: 'g', bold: true, border: true }); cell('E' + r, res.sl.betrag, { fill: 'g', bold: true, border: true, fmt: ACC }); add.push('E' + r); r += 2; }
+    // Qualitätssicherung
+    row5(r, 'y', false); cell('A' + r, 'Qualitätssicherung', { fill: 'y', bold: true, size: 14, underline: true });
+    cell('B' + r, 'Soll', { fill: 'y', bold: true, h: 'center' }); cell('C' + r, 'Ist', { fill: 'y', bold: true, h: 'center' }); r++;
+    row5(r, 'y', false); r++;
     res.qual.forEach(x => {
       const fmt = x.fmt === 'pct' ? '0%' : x.fmt === 'eur' ? EUR : '0';
-      cell('A' + r, x.label, { fill: 'y' }); cell('B' + r, x.soll, { fill: 'y', fmt, h: 'center' }); cell('C' + r, x.rated ? x.ist : null, { fill: 'y', fmt, h: 'center' });
-      const f = `IF(N(C${r})<B${r},-${R.abzug},0)`;
-      cell('D' + r, fx(f, x.faktor), { fill: 'y', fmt: '0%', h: 'right' }); cell('E' + r, fx(`$E$${rSum}*D${r}`, x.betrag), { fill: 'w', bold: true, fmt: ACC }); add.push('E' + r); r++;
+      row5(r, 'y');
+      cell('A' + r, x.label, { fill: 'y', border: true });
+      cell('B' + r, x.soll, { fill: 'y', border: true, fmt, h: 'center' });
+      cell('C' + r, x.rated ? x.ist : null, { fill: x.color && x.rated ? (x.miss ? 'r' : 'g') : 'y', border: true, fmt, h: 'center' });
+      cell('D' + r, x.rate, { fill: 'y', border: true, fmt: '0%', h: 'center' });
+      cell('E' + r, fx(`IF(N(C${r})<B${r},-$E$${rSum}*D${r},0)`, x.betrag), { fill: 'y', border: true, bold: true, fmt: ACC });
+      add.push('E' + r); r++;
     });
-    res.korr.filter(k => k.betrag).forEach(k => { cell('A' + r, k.label + (k.note ? ' – ' + k.note : ''), { fill: 'y', bold: true }); 'BCD'.split('').forEach(c => cell(c + r, null, { fill: 'y' })); cell('E' + r, k.betrag, { fill: 'w', bold: true, fmt: ACC }); add.push('E' + r); r++; });
+    res.korr.filter(k => k.betrag).forEach(k => { row5(r, 'y'); cell('A' + r, k.label + (k.note ? ' – ' + k.note : ''), { fill: 'y', border: true, bold: true }); cell('E' + r, k.betrag, { fill: 'y', border: true, bold: true, fmt: ACC }); add.push('E' + r); r++; });
     let sc = null;
-    if (res.sonder.betrag) { cell('A' + r, 'Sonderprovision' + (res.sonder.text ? ': ' + res.sonder.text : ''), { fill: 'y', bold: true }); 'BCD'.split('').forEach(c => cell(c + r, null, { fill: 'y' })); cell('E' + r, res.sonder.betrag, { fill: 'w', bold: true, fmt: ACC }); sc = 'E' + r; r++; }
-    cell('A' + r, `Provisionsabsicherung ${R.fix},- €`, { size: 9 }); r += 2;
-    'ABCDE'.split('').forEach(c => { cell(c + r, undefined, { fill: 'g', border: false }); cell(c + (r + 1), undefined, { fill: 'g', border: false }); cell(c + (r + 2), undefined, { fill: 'g', border: false }); });
-    cell('A' + r, 'Auszahlungsbetrag', { fill: 'g', bold: true, size: 16, border: false }); cell('D' + r, inp.monat || '', { fill: 'g', bold: true, size: 13, border: false, h: 'right' });
+    if (res.sonder.betrag) { row5(r, 'y'); cell('A' + r, 'Sonderprovision' + (res.sonder.text ? ': ' + res.sonder.text : ''), { fill: 'y', border: true, bold: true }); cell('E' + r, res.sonder.betrag, { fill: 'y', border: true, bold: true, fmt: ACC }); sc = 'E' + r; r++; }
+    cell('A' + r, `Provisionsabsicherung ${R.fix},-€`, { size: 9, color: 'FF002060' }); r++;
+    // Auszahlung
+    [r, r + 1, r + 2].forEach(q => row5(q, 'g', false));
+    cell('A' + r, 'Auszahlungsbetrag', { fill: 'g', bold: true, size: 14, underline: true });
+    cell('D' + r, inp.monat || '', { fill: 'g', bold: true, size: 12, underline: true });
     const expr = `E${rSum}+${add.join('+') || '0'}`;
-    const tc = cell('E' + r, fx(sc ? `MAX(${expr},${R.fix})+${sc}` : `MAX(${expr},${R.fix})`, res.total), { fill: 'g', bold: true, size: 16, border: false, fmt: EUR });
-    tc.font = { ...tc.font, underline: 'doubleAccounting' };
-    cell('A' + (r + 2), 'Datum & Unterschrift Mitarbeiter', { fill: 'g', size: 9, border: false }); cell('C' + (r + 2), 'Datum & Unterschrift Vorgesetzter', { fill: 'g', size: 9, border: false });
-    r += 4;
+    cell('E' + r, fx(sc ? `MAX(${expr},${R.fix})+${sc}` : `MAX(${expr},${R.fix})`, res.total), { fill: 'g', bold: true, size: 14, fmt: EUR });
+    ws.getRow(r + 1).height = 26;
+    cell('A' + (r + 2), 'Datum & Unterschrift Mitarbeiter', { fill: 'g', size: 8 }); cell('C' + (r + 2), '& Unterschrift Vorgesetzter', { fill: 'g', size: 8 });
+    r += 3;
+    cell('A' + r, 'Sicherungsprovision', { size: 8 }); cell('E' + r, R.fix, { bold: true, italic: true, fmt: EUR }); r += 1;
+    // Regularien
     const reg = regularien(R);
-    [['Qualitätssicherung durch Malusregelungen', reg.malus], ['Prozess Abrechnung', reg.prozess], ['Spielregeln Provisionsvereinbarung', reg.spielregeln]].forEach(([t, ls]) => {
-      cell('A' + r, t, { bold: true, size: 12, color: 'FF002060' }); r++;
-      ls.forEach(l => { ws.mergeCells(`A${r}:E${r}`); cell('A' + r, l, { size: 9, color: 'FF002060', wrap: true }); ws.getRow(r).height = l.length > 140 ? 26 : 14; r++; });
+    const sect = (title, lines, map) => {
+      row5(r, 'l', false); cell('A' + r, title, { fill: 'l', bold: true, size: 14, underline: true, color: 'FF002060' }); r++;
+      lines.forEach(l => { ws.mergeCells(`A${r}:E${r}`); cell('A' + r, map(l), { fill: 'l', size: 8, color: 'FF002060' }); r++; });
       r++;
-    });
+    };
+    sect('Qualitätssicherung durch Malusregelungen auf potentiellen Auszahlungsauftrag', reg.malus, ([a, b]) => (a + b).trim());
+    sect('Prozess Abrechnung:', reg.prozess, l => l);
+    sect('Spielregeln Provisionsvereinbarung', reg.spielregeln(name), l => l);
+    ws.pageSetup.printArea = `A1:E${r}`;
     return { buffer: await wb.xlsx.writeBuffer(), res };
   }
 
@@ -1191,7 +1277,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
           vfNeu: num(d.vfNeu), vfVvl: num(d.vfVvl), handys: num(d.handys), ks: num(d.ks), zubStk: num(d.zubStk), zubMarge: num(d.zubMarge),
           werb: typeof d.werb === 'number' && d.werb >= 0 && d.werb <= 1.5 ? pc(d.werb) : '', pencil: typeof d.pencil === 'number' && d.pencil >= 0 && d.pencil <= 1.5 ? pc(d.pencil) : '',
           tel: telEmpty ? '' : num(d.tel), urlaub: num(d.urlaub), krank: num(d.krank), interessenten: num(d.interessenten), gesamtmarge: num(d.gesamtmarge),
-          inst: '', instVor: '', tvq: '', shopMarge: ''
+          inst: '', instVor: '', tvq: '', shopMarge: '', pushStk: ''
         } };
       }
       // Platzhalter, falls der Name in A1 falsch ist: Blattname nutzen
@@ -1247,7 +1333,7 @@ const O2_RULE_GROUPS = [
 
 
 const pcS = v => v === '' || v == null ? '–' : num(v) + '%';
-const FH_BLANK = { po: '', poC: '', vvl: '', vvlC: '', dp: '', tp: '', fnVvl: '', vfNeu: '', vfVvl: '', handys: '', ks: '', zubStk: '', zubMarge: '', gesamtmarge: '', inst: '', instVor: '', tel: '', pencil: '', werb: '', interessenten: '', tvq: '', shopMarge: '', urlaub: '', krank: '', standort: '' };
+const FH_BLANK = { pushStk: '', po: '', poC: '', vvl: '', vvlC: '', dp: '', tp: '', fnVvl: '', vfNeu: '', vfVvl: '', handys: '', ks: '', zubStk: '', zubMarge: '', gesamtmarge: '', inst: '', instVor: '', tel: '', pencil: '', werb: '', interessenten: '', tvq: '', shopMarge: '', urlaub: '', krank: '', standort: '' };
 const PROFILES = {
   o2: {
     id: 'o2', prefix: 'provi', title: 'o2 Shops', core: window.Provi, BLANK: O2_BLANK, GROUPS: O2_GROUPS, RULE_GROUPS: O2_RULE_GROUPS, SL_DEFAULTS: O2_SL_DEFAULTS,
@@ -1270,32 +1356,31 @@ const PROFILES = {
   },
   fh: {
     id: 'fh', prefix: 'provifh', title: 'Fachhandel', core: window.ProviFH, BLANK: FH_BLANK, SL_DEFAULTS: {},
-    GS_LABELS: { tel: 'Telefonie + Abfrage', pencil: 'Pencil Selling', werb: 'Werbeversprechen' },
-    features: { teilzeit: false }, pushLabel: 'Company Sonderpush', telField: 'tel',
+    GS_LABELS: { tel: 'Telefonie + Abfrage', pencil: 'Pencil Selling', werb: 'Werbeversprechen', int: 'Interessenten', tvq: 'TV-Quote', erg: 'Ergebnissicherung' },
+    features: { teilzeit: false }, pushLabel: 'Company Sonderpush (zusätzlicher Betrag)', telField: 'tel',
     chips: () => [],
     GROUPS: [
       { title: 'Standort', fields: [['standort', 'Standort (z. B. Telekom Partner Crailsheim)', 'text']] },
-      { title: 'Mobilfunk', fields: [['po', 'PO Neu'], ['poC', 'PO Neu Congstar'], ['vvl', 'VVL'], ['vvlC', 'VVL Congstar']] },
+      { title: 'Mobilfunk', fields: [['po', 'PO Neu'], ['poC', 'PO Neu Congstar'], ['vvl', 'VVL'], ['vvlC', 'VVL Congstar'], ['ks', 'Komplettschutz']] },
       { title: 'Festnetz', fields: [['dp', 'T-Com Neu/WW DP'], ['tp', 'T-Com Neu/WW TP'], ['fnVvl', 'T-Com VVL']] },
-      { title: 'Marge, Zubehör & Service', fields: [['gesamtmarge', 'Gesamtmarge €'], ['zubStk', 'Zubehör Stück'], ['zubMarge', 'Zubehör Marge €'], ['inst', 'Installationsservice (Stück)'], ['instVor', 'Installation vor Ort (Stück)']] },
-      { title: 'Qualität (leer = Abzug)', fields: [['tel', 'Telefonie gesamt (VVL Telefonie + Abfrage)'], ['pencil', 'Pencil Selling %'], ['werb', 'Werbeversprechen %']] },
+      { title: 'Marge, Zubehör & Service', fields: [['gesamtmarge', 'Gesamtmarge €'], ['zubStk', 'Zubehör Stück'], ['zubMarge', 'Zubehör Marge €'], ['inst', 'Installationsservice (Stück)'], ['instVor', 'Installation vor Ort (Stück)'], ['pushStk', 'Company Sonderpush (Stück)']] },
+      { title: 'Qualität', fields: [['tel', 'VVL Telefonie + Abfrage'], ['pencil', 'Pencil Selling %'], ['werb', 'Werbeversprechen %'], ['interessenten', 'Interessenten (Stück)'], ['tvq', 'TV-Aktivierungsquote %'], ['shopMarge', 'Marge Shop € (leer = pers. Marge)']] },
       { title: 'Abwesenheit', fields: [['urlaub', 'Urlaub (Tage)'], ['krank', 'Krank (Tage)']] }
     ],
     RULE_GROUPS: [
       ['Persönliche Marge', [['margeSockel', 'Sockel €', 1], ['margeAnteil', 'Anteil %', 100]]],
-      ['Mobilfunk', [['neuSockel', 'PO neu gesamt Sockel', 1], ['neuBetrag', 'PO neu gesamt €', 1], ['vvlSockel', 'VVL gesamt Sockel', 1], ['vvlBetrag', 'VVL gesamt €', 1]]],
-      ['Festnetz', [['dpSockel', 'DP Sockel', 1], ['dpBetrag', 'DP €', 1], ['tpSockel', 'TP Sockel', 1], ['tpBetrag', 'TP €', 1], ['fnVvlSockel', 'T-Com VVL Sockel', 1], ['fnVvlBetrag', 'T-Com VVL €', 1]]],
-      ['Zubehör & Service', [['zubSockel', 'Zubehör Sockel €', 1], ['zubAnteil', 'Zubehör Anteil %', 100], ['instBetrag', 'Installationsservice €', 1], ['instVorBetrag', 'Installation vor Ort €', 1]]],
+      ['Mobilfunk', [['neuSockel', 'Neuvertrag Sockel', 1], ['neuBetrag', 'Neuvertrag €', 1], ['vvlSockel', 'VVL Sockel', 1], ['vvlBetrag', 'VVL €', 1], ['vvlMitCongstar', 'VVL inkl. Congstar (1 = ja, 0 = nein)', 1]]],
+      ['Festnetz', [['dpSockel', 'DP Sockel', 1], ['dpBetrag', 'DP €', 1], ['dpMitTp', 'DP-Zeile inkl. TP (1 = ja, 0 = nein)', 1], ['tpSockel', 'TP Sockel', 1], ['tpBetrag', 'TP €', 1], ['fnVvlSockel', 'FN VVL Sockel', 1], ['fnVvlBetrag', 'FN VVL €', 1]]],
+      ['Komplettschutz, Zubehör, Service', [['ksSockel', 'KS Sockel', 1], ['ksBetrag', 'KS €', 1], ['zubSockel', 'Zubehör Sockel €', 1], ['zubAnteil', 'Zubehör Anteil %', 100], ['instBetrag', 'Installationsservice €', 1], ['instVorBetrag', 'Installation vor Ort €', 1], ['pushEinzel', 'Sonderpush € je Stück', 1]]],
       ['Urlaub/Krankheit', [['abwBetrag', '€ je Tag', 1]]],
-      ['Qualitätssicherung (Malus)', [['abzug', 'Malus je Ziel %', 100], ['telSoll', 'Telefonie gesamt Soll', 1], ['pencilSoll', 'Pencil Selling Soll %', 100], ['werbSoll', 'Werbeversprechen Soll %', 100]]],
+      ['Qualitätssicherung (Soll / Abzug)', [['telSoll', 'Telefonie Soll', 1], ['telAbzug', 'Telefonie Abzug %', 100], ['pencilSoll', 'Pencil Soll %', 100], ['pencilAbzug', 'Pencil Abzug %', 100], ['werbSoll', 'Werbeversprechen Soll %', 100], ['werbAbzug', 'Werbeversprechen Abzug %', 100], ['intSoll', 'Interessenten Soll', 1], ['intAbzug', 'Interessenten Abzug %', 100], ['tvqSoll', 'TV-Quote Soll %', 100], ['tvqAbzug', 'TV-Quote Abzug %', 100], ['ergSoll', 'Ergebnissicherung Soll €', 1], ['ergAbzug', 'Ergebnissicherung Abzug %', 100]]],
       ['Absicherung', [['fix', 'Provisionsabsicherung €', 1]]],
-      ['Zielpunkte (Info im PDF)', [['zielMarge', 'Marge €', 1], ['zielNeu', 'PO neu gesamt', 1], ['zielVvl', 'VVL gesamt', 1], ['zielDp', 'DP', 1], ['zielTp', 'TP', 1], ['zielFnVvl', 'T-Com VVL', 1], ['zielZub', 'Zubehör Marge €', 1]]]
+      ['Zielpunkte (Info im PDF)', [['zielMarge', 'pers. Marge €', 1], ['zielNeu', 'MF Neu', 1], ['zielNeuC', 'Congstar Neu', 1], ['zielVvl', 'MF VVL', 1], ['zielVvlC', 'Congstar VVL', 1], ['zielDp', 'DP', 1], ['zielTp', 'TP', 1], ['zielFnVvl', 'FN VVL', 1], ['zielKs', 'KS', 1], ['zielZub', 'Zubehör €', 1]]]
     ],
     kpis: [
       { h: 'Marge', title: 'Gesamtmarge', v: i => i.gesamtmarge === '' ? '–' : Math.round(Number(i.gesamtmarge)).toLocaleString('de-DE') },
-      { h: 'PO', title: 'PO neu gesamt', v: i => num((Number(i.po) || 0) + (Number(i.poC) || 0)) }, { h: 'VVL', title: 'VVL gesamt', v: i => num((Number(i.vvl) || 0) + (Number(i.vvlC) || 0)) },
-      { h: 'DP', v: i => show(i.dp) }, { h: 'TP', v: i => show(i.tp) }, { h: 'FN-VVL', title: 'T-Com VVL', v: i => show(i.fnVvl) },
-      { h: 'Zub.', title: 'Zubehör Marge €', v: i => show(i.zubMarge) },
+      { h: 'Neu', title: 'PO Neu + Congstar', v: i => num((Number(i.po) || 0) + (Number(i.poC) || 0)) }, { h: 'VVL', v: i => show(i.vvl) },
+      { h: 'DP', v: i => show(i.dp) }, { h: 'TP', v: i => show(i.tp) }, { h: 'FN-VVL', title: 'T-Com VVL', v: i => show(i.fnVvl) }, { h: 'KS', v: i => show(i.ks) },
       { h: 'Tel.', q: 'tel', v: i => show(i.tel) }, { h: 'Pencil', q: 'pencil', v: i => pcS(i.pencil) }, { h: 'DNE', q: 'werb', v: i => pcS(i.werb) },
       { h: 'Abw.', v: i => num((Number(i.urlaub) || 0) + (Number(i.krank) || 0)) }
     ],
