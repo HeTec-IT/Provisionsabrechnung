@@ -824,7 +824,46 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     return hits.length === 1 ? hits[0] : null;
   }
 
-  root.Provi = { addZusatz, addSonder, cellVal, parseTelefonie, matchTelefonie, parsePerformance, MONATE, monatsInfo, RULES_VERSION, DEFAULT_RULES, KORR_LABELS, GS, calc, buildXlsx, buildPdf, regularien, eur, pf };
+  // ---------- Import DNE / Werbeversprechen (WOBIS) ----------
+  // Spalte A „Nachname Vorname“ (Bindestrich-Namen bleiben zusammen, z. B. „Maragkozidou-Festeris Eleni“,
+  // „Festeris Sokratis-Konstantinos“), Spalte D = % Kunden DNE (Bruch 0–1).
+  const NAME_PREFIX = new Set(['da', 'de', 'di', 'do', 'dos', 'das', 'del', 'della', 'van', 'von', 'vom', 'der', 'den', 'ter', 'ten', 'la', 'le', 'el', 'al', 'zu', 'zur']);
+  const nameTokens = s => String(s || '').toLowerCase().replace(/ß/g, 'ss').replace(/ı/g, 'i').normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[\s\-,.]+/).filter(Boolean);
+  function splitNachVor(s) {
+    const parts = String(s || '').trim().split(/\s+/).filter(Boolean);
+    let i = 1;
+    while (i < parts.length - 1 && NAME_PREFIX.has(parts[i - 1].toLowerCase())) i++; // „Da Silva Diego“ → Nachname „Da Silva“
+    return { nachname: parts.slice(0, i).join(' '), vorname: parts.slice(i).join(' ') };
+  }
+  function parseDne(wb) {
+    const ws = wb.worksheets.find(w => !w.state || w.state === 'visible') || wb.worksheets[0];
+    const list = [];
+    for (let r = 1; r <= ws.rowCount; r++) {
+      const a = cellVal(ws.getCell(r, 1)), b = cellVal(ws.getCell(r, 2)), c = cellVal(ws.getCell(r, 3)), d = cellVal(ws.getCell(r, 4));
+      if (typeof a !== 'string' || /^(gesamt|summe|total)\b/i.test(a.trim())) continue;
+      let q = typeof d === 'number' ? d : (typeof b === 'number' && b > 0 && typeof c === 'number' ? c / b : null);
+      if (q == null || q < 0 || q > 1.5) continue;
+      const nv = splitNachVor(a.trim());
+      list.push({ name: a.trim(), ...nv, kunden: typeof b === 'number' ? b : null, dne: typeof c === 'number' ? c : null, werb: Math.round(q * 1000) / 10 });
+    }
+    return list;
+  }
+  function matchDne(fullName, sheet, list) {
+    if (!list || !list.length) return null;
+    const key = a => a.slice().sort().join('|');
+    const emp = nameTokens(fullName);
+    const exact = list.filter(x => key(nameTokens(x.nachname + ' ' + x.vorname)) === key(emp));
+    if (exact.length === 1) return exact[0];
+    if (exact.length > 1) return null;
+    // Fallback: Nachname vollständig und erster Vorname-Teil im Namen des Mitarbeiters enthalten
+    const hits = list.filter(x => {
+      const nn = nameTokens(x.nachname), vn = nameTokens(x.vorname);
+      return nn.length && vn.length && nn.every(t => emp.includes(t)) && emp.includes(vn[0]);
+    });
+    return hits.length === 1 ? hits[0] : null;
+  }
+
+  root.Provi = { addZusatz, addSonder, cellVal, parseTelefonie, matchTelefonie, parseDne, matchDne, splitNachVor, parsePerformance, MONATE, monatsInfo, RULES_VERSION, DEFAULT_RULES, KORR_LABELS, GS, calc, buildXlsx, buildPdf, regularien, eur, pf };
   if (typeof module !== 'undefined') module.exports = root.Provi;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -1310,7 +1349,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
 <script type="text/babel" data-presets="react">const { useState, useMemo, useEffect, useRef } = React;
-const { parseTelefonie, matchTelefonie, MONATE, eur, pf } = window.Provi;
+const { parseTelefonie, matchTelefonie, parseDne, matchDne, MONATE, eur, pf } = window.Provi;
 let CUR = null; // aktives Profil (o2 / Fachhandel)
 const calc = (...x) => CUR.core.calc(...x);
 const buildXlsx = (...x) => CUR.core.buildXlsx(...x);
@@ -1443,7 +1482,7 @@ const PROFILES = {
     ],
     todo: (inp, row, data) => {
       const t = [];
-      if (inp.werb === '') t.push({ k: 'werb', t: row.warn.find(w => w.startsWith('Werbeversprechen ungültig')) || 'Werbeversprechen fehlt' });
+      if (inp.werb === '') t.push({ k: 'werb', t: data.dne ? 'Werbeversprechen: Name nicht in DNE-Datei gefunden' : (row.warn.find(w => w.startsWith('Werbeversprechen ungültig')) || 'Werbeversprechen fehlt') });
       if (inp.pencil === '') t.push({ k: 'pencil', t: 'Pencil Selling fehlt' });
       if (inp.marketing === '') t.push({ k: 'marketing', t: data.telefonie ? 'Telefonie: Name nicht gefunden' : 'Telefonie fehlt' });
       if (row.warn.includes('Spalte Urlaub/Krank fehlt') && inp.urlaub === '') t.push({ t: 'Urlaub/Krank fehlt' });
@@ -1480,11 +1519,11 @@ const PROFILES = {
       { h: 'Tel.', q: 'tel', v: i => show(i.tel) }, { h: 'Pencil', q: 'pencil', v: i => pcS(i.pencil) }, { h: 'DNE', q: 'werb', v: i => pcS(i.werb) },
       { h: 'Abw.', v: i => num((Number(i.urlaub) || 0) + (Number(i.krank) || 0)) }
     ],
-    todo: (inp, row) => {
+    todo: (inp, row, data) => {
       const t = [];
       if (inp.tel === '') t.push({ k: 'tel', t: 'Telefonie fehlt' });
       if (inp.pencil === '') t.push({ k: 'pencil', t: 'Pencil Selling fehlt' });
-      if (inp.werb === '') t.push({ k: 'werb', t: 'Werbeversprechen fehlt' });
+      if (inp.werb === '') t.push({ k: 'werb', t: data && data.dne ? 'Werbeversprechen: Name nicht in DNE-Datei gefunden' : 'Werbeversprechen fehlt' });
       row.warn.forEach(w => { if (w.startsWith('Name in A1')) t.push({ t: w }); });
       if (row.warn.includes('Spalte Urlaub/Krank fehlt') && inp.urlaub === '') t.push({ t: 'Urlaub/Krank fehlt' });
       return t;
@@ -1657,6 +1696,7 @@ function App() {
   const [drag, setDrag] = useState(false);
   const fileRef = useRef();
   const telRef = useRef();
+  const dneRef = useRef();
   const bakRef = useRef();
   useEffect(() => save(pk('rules'), R), [R]);
   useEffect(() => save(pk('data'), data), [data]);
@@ -1697,7 +1737,8 @@ function App() {
       const row = e.rows[meta.monat];
       const o = ov[key(e.sheet)] || {};
       const tel = data.telefonie ? matchTelefonie(e.fullName, data.telefonie.list) : null;
-      const base = { ...CUR.BLANK, ...row.inp, ...(tel ? { [CUR.telField]: tel.tel } : {}) };
+      const dne = data.dne ? matchDne(e.fullName, e.sheet, data.dne.list) : null;
+      const base = { ...CUR.BLANK, ...row.inp, ...(tel ? { [CUR.telField]: tel.tel } : {}), ...(dne ? { werb: dne.werb } : {}) };
       const sl = slSet[e.sheet] || {};
       const inp = { ...base, name: e.sheet, vollerName: e.fullName, ...shared, ...(o.fields || {}),
         teilzeit: !!tzSet[e.sheet], shopleiter: !!sl.on, slRate1: sl.r1 ?? '', slRate2: sl.r2 ?? '', slZiel: (o.fields || {}).slZiel ?? sl.ziel ?? '', slIst: (o.fields || {}).slIst ?? '' };
@@ -1739,7 +1780,7 @@ function App() {
       await wb.xlsx.load(await file.arrayBuffer());
       const d = CUR.core.parsePerformance(wb);
       if (!d.employees.length) throw new Error('Keine Mitarbeiterblätter mit Spalte „PO gesamt“ gefunden.');
-      setData(old => ({ ...d, telefonie: old?.telefonie, file: file.name, loaded: new Date().toISOString() }));
+      setData(old => ({ ...d, telefonie: old?.telefonie, dne: old?.dne, file: file.name, loaded: new Date().toISOString() }));
       setMeta(m => ({ ...m, monat: d.months.includes(m.monat) ? m.monat : (d.months[d.months.length - 1] || MONATE[0]) }));
       setMsg(`${d.employees.length} Mitarbeiter aus „${file.name}“ eingelesen.`);
     } catch (e) { setMsg('Datei konnte nicht gelesen werden: ' + e.message); }
@@ -1755,6 +1796,20 @@ function App() {
       setData(d => ({ ...(d || { employees: [], months: [] }), telefonie: { file: file.name, list } }));
       setMsg(`Telefoniewerte für ${list.length} Personen aus „${file.name}“ eingelesen.`);
     } catch (e) { setMsg('Telefonie-Datei konnte nicht gelesen werden: ' + e.message); }
+    setBusy('');
+  }
+
+  async function readDne(file) {
+    setMsg(''); setBusy('dne');
+    try {
+      const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer());
+      const list = parseDne(wb);
+      if (!list.length) throw new Error('Keine Zeilen mit Name (Spalte A) und DNE-Prozent (Spalte D) gefunden.');
+      setData(d => ({ ...(d || { employees: [], months: [] }), dne: { file: file.name, list } }));
+      const emps = data ? data.employees : [];
+      const miss = emps.filter(e => !matchDne(e.fullName, e.sheet, list)).map(e => e.fullName);
+      setMsg(`DNE-Werte für ${list.length} Personen aus „${file.name}“ eingelesen.` + (emps.length ? (miss.length ? ` Nicht zugeordnet: ${miss.join(', ')}.` : ' Alle Mitarbeiter zugeordnet.') : ''));
+    } catch (e) { setMsg('DNE-Datei konnte nicht gelesen werden: ' + e.message); }
     setBusy('');
   }
   async function oneXlsx(inp) { setBusy('xlsx'); try { const { buffer } = await buildXlsx(ExcelJS, null, inp, R); download(new Blob([buffer], { type: XLSX_MIME }), fname(inp, 'xlsx')); } catch (e) { setMsg('Excel-Fehler: ' + e.message); } setBusy(''); }
@@ -1893,6 +1948,15 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
         <input ref={telRef} type="file" accept=".xlsx,.xlsm" hidden onChange={e => { const f = e.target.files[0]; if (f) readTel(f); e.target.value = ''; }} />
         <strong>{busy === 'tel' ? 'Lese Datei …' : 'Telefonie-Excel (WOBIS) ablegen'}</strong>
         <span>{data?.telefonie ? `Aktuell: ${data.telefonie.file} · ${data.telefonie.list.length} Personen` : 'Spalte A Name, Spalte B Telefonie – ersetzt den Marketingwert'}</span>
+      </div>
+      <div className="drop small"
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) readDne(f); }}
+        onClick={() => dneRef.current.click()} role="button" tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') dneRef.current.click(); }}>
+        <input ref={dneRef} type="file" accept=".xlsx,.xlsm" hidden onChange={e => { const f = e.target.files[0]; if (f) readDne(f); e.target.value = ''; }} />
+        <strong>{busy === 'dne' ? 'Lese Datei …' : 'DNE-Excel (Werbeversprechen) ablegen'}</strong>
+        <span>{data?.dne ? `Aktuell: ${data.dne.file} · ${data.dne.list.length} Personen` : 'Spalte A „Nachname Vorname“, Spalte D DNE % – ersetzt den Werbeversprechen-Wert'}</span>
       </div>
       {msg && <p className="msg">{msg}</p>}
 
