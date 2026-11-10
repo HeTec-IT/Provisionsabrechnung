@@ -1666,6 +1666,28 @@ function App() {
   useEffect(() => save(pk('tz'), tzSet), [tzSet]);
   useEffect(() => save(pk('manual'), manual), [manual]);
 
+  // Beim ersten Öffnen in einem neuen Kalendermonat automatisch auf den aktuellen Monat wechseln.
+  // Die bisherigen Monatsdaten und Versandnachweise bleiben in ihren eigenen Monatsschlüsseln erhalten.
+  useEffect(() => {
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const handled = load(pk('autoMonth'), '');
+    if (handled !== monthKey) {
+      setMeta(m => ({ ...m, monat: MONATE[now.getMonth()], jahr: String(now.getFullYear()), datum: heute() }));
+      save(pk('autoMonth'), monthKey);
+    }
+  }, []);
+
+  const refreshMonth = () => {
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    setMeta(m => ({ ...m, monat: MONATE[now.getMonth()], jahr: String(now.getFullYear()), datum: heute() }));
+    save(pk('autoMonth'), monthKey);
+    setEdit(null);
+    setMailDlg(null);
+    setMsg(`Abrechnungsmonat auf ${MONATE[now.getMonth()]} ${now.getFullYear()} gestellt. Alte Monatsdaten und Versandnachweise bleiben erhalten. ${data?.months?.includes(MONATE[now.getMonth()]) ? 'Die Monatswerte sind vorhanden.' : 'Bitte jetzt die neue Performance-Excel für diesen Monat einlesen.'}`);
+  };
+
   const key = sheet => `${meta.jahr}|${meta.monat}|${sheet}`;
   const shared = { monat: meta.monat, jahr: meta.jahr, ort: meta.ort, datum: meta.datum };
 
@@ -1848,6 +1870,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
       <Header />
       <div className="backup">
         <span>Sicherung: alle Werte, Kulanzen, Begründungen und Notizen</span>
+        <button className="btn-s" onClick={refreshMonth} title="Stellt den aktuellen Kalendermonat ein, ohne frühere Abrechnungen oder Versandnachweise zu löschen">↻ Monat aktualisieren</button>
         <button className="btn-s" onClick={saveBackup} disabled={!data}>Sicherung speichern</button>
         <button className="btn-s" onClick={() => bakRef.current.click()}>Sicherung laden</button>
         <input ref={bakRef} type="file" accept=".json,application/json" hidden onChange={e => { const f = e.target.files[0]; if (f) loadBackup(f); e.target.value = ''; }} />
