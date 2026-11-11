@@ -1615,7 +1615,7 @@ function Editor({ inp, R, onPatch, onReset, onBack, onXlsx, onPdf, busy, importe
           <div className="card">
             <h2>Mitarbeiter</h2>
             {CUR.features.teilzeit && <label className="check" style={{ marginBottom: 12 }}><input type="checkbox" checked={!!inp.teilzeit} onChange={e => onPatch({ teilzeit: e.target.checked })} /> Azubi / Teilzeit (Ziel {R.tvSollTZ} TV, {R.osSollTZ} Online-Schutz)</label>}
-            {CUR.features.einstieg && <label className="check" style={{ marginBottom: 12 }}><input type="checkbox" checked={!!inp.einstiegsfrei} onChange={e => onPatch({ einstiegsfrei: e.target.checked })} /> Alle 5 Qualitätsziele des Shops erreicht (Postpaid und DSL ab dem 1. Vertrag, keine Einstiegsschwelle)</label>}
+            {CUR.features.einstieg && <label className="check" style={{ marginBottom: 12 }}><input type="checkbox" checked={!inp.einstiegsfrei} onChange={e => onPatch({ einstiegsfrei: !e.target.checked })} /> Einstiegsschwelle gilt (ohne Haken: Postpaid und DSL ab dem 1. Vertrag)</label>}
             <div className="grid">
               <Field label="Name (Abrechnung)" type="text" value={inp.name} onChange={up('name')} />
               <Field label="Vor- und Nachname (Vereinbarung)" type="text" value={inp.vollerName} onChange={up('vollerName')} />
@@ -1993,8 +1993,8 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
             <h2>{meta.monat} {meta.jahr}</h2>
             <span>{chosen.length} von {list.length} ausgewählt · {chosen.filter(x => x.todo.length).length} mit Handlungsbedarf · <span className="okc">{chosen.filter(x => x.sent).length} versendet</span> · Auszahlung gesamt <b>{eur(sum)}</b></span>
             {CUR.features.einstieg && <span>
-              <button className="btn-s" title="Alle 5 Qualitätsziele erreicht: bei allen Mitarbeitern keine Einstiegsschwelle" onClick={() => setEsAll(true)}>Alle: Ziele erreicht</button>{' '}
-              <button className="btn-s" title="Einstiegsschwelle gilt bei allen Mitarbeitern" onClick={() => setEsAll(false)}>Alle: Schwelle gilt</button>
+              <button className="btn-s" title="Bei allen Mitarbeitern keine Einstiegsschwelle" onClick={() => setEsAll(true)}>Alle: Einstiegsschwelle nein</button>{' '}
+              <button className="btn-s" title="Bei allen Mitarbeitern gilt die Einstiegsschwelle" onClick={() => setEsAll(false)}>Alle: Einstiegsschwelle ja</button>
             </span>}
           </div>
           <div className="scroll">
@@ -2016,7 +2016,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
                         <strong>{x.e.fullName}</strong>
                         <span className="toggles">
                           {CUR.features.teilzeit && <label className="tgl"><input type="checkbox" checked={!!i.teilzeit} onChange={ev => patchSl(x.e.sheet, { teilzeit: ev.target.checked })} />Azubi/TZ</label>}
-                          {CUR.features.einstieg && <label className="tgl" title="Alle 5 Qualitätsziele des Shops erreicht: Postpaid und DSL ab dem 1. Vertrag, keine Einstiegsschwelle"><input type="checkbox" checked={!!i.einstiegsfrei} onChange={ev => patchSl(x.e.sheet, { einstiegsfrei: ev.target.checked })} />Ziele erreicht</label>}
+                          {CUR.features.einstieg && <label className="tgl" title="Haken = Einstiegsschwelle gilt. Ohne Haken: Postpaid und DSL ab dem 1. Vertrag"><input type="checkbox" checked={!i.einstiegsfrei} onChange={ev => patchSl(x.e.sheet, { einstiegsfrei: !ev.target.checked })} />Einstiegsschwelle</label>}
                           <label className="tgl"><input type="checkbox" checked={!!i.shopleiter} onChange={ev => patchSl(x.e.sheet, { shopleiter: ev.target.checked })} />Shopleiter</label>
                           {x.sent && <small className={'tag ' + (x.sentChanged ? 'sentwarn' : 'sent')} title={`An ${x.sent.to} am ${new Date(x.sent.at).toLocaleString('de-DE')} · ${eur(x.sent.total)}`}>{x.sentChanged ? `✓ versendet ${kurzDatum(x.sent.at)} – Betrag geändert` : `✓ versendet ${kurzDatum(x.sent.at)}`}</small>}
                           {x.edited && <small className="tag">bearbeitet</small>}
