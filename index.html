@@ -215,21 +215,28 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
   const e0 = v => (Number.isInteger(v) ? v.toLocaleString('de-DE') + ',-' : v.toLocaleString('de-DE', { minimumFractionDigits: 2 })) + ' €';
   const nf = v => (Math.round(v * 10) / 10).toLocaleString('de-DE');
   const strip = s => String(s).replace(/\*\*/g, '');
+  // Alle 5 Qualitätsziele des Shops erreicht → keine Einstiegsschwelle für Postpaid und DSL (ab dem ersten Vertrag)
+  const effR = (inp, R) => inp && inp.einstiegsfrei ? { ...R, ppSchwelle: 0, dslSchwelle: 0 } : R;
+  const gr = s => s > 0 ? `größer ${s} Stück` : 'ab dem ersten Stück';
 
-  function regularien(R) {
-    return [
+  function regularien(R0, inp) {
+    const R = effR(inp, R0);
+    const L = [
       `Sollten die Qualitätsziele von dem Mitarbeiter nicht erreicht werden, wird je Qualitätsziel, welches nicht erreicht wird, ${pf(R.abzug)} von der Provisionssumme abgezogen.`,
       `Qualitätsziele o2 TV und Online-Schutz je Monat (anteilig nach Arbeitstagen): Vollzeit ${R.tvSoll} TV und ${R.osSoll} Online-Schutz, Azubis/Teilzeit ${R.tvSollTZ} TV und ${R.osSollTZ} Online-Schutz.`,
       `Wenn der Mitarbeiter einen MSY Wert größer ${pf(R.msySoll)} erreicht, gibt es einmalig ${eur(R.msyBonus)} für den Mitarbeiter.`,
-      `Der Mitarbeiter erhält ${eur(R.ppBetrag)} je o2 Postpaid-Neuvertrag größer ${R.ppSchwelle} Stück.`,
-      `Wenn die DSL-Quote größer ${pf(R.dslSoll)} ist, erhält der Mitarbeiter ${eur(R.dslBetragHoch)} je DSL-Neuvertrag größer ${R.dslSchwelle} Stück, sonst ${eur(R.dslBetragNiedrig)} je DSL-Neuvertrag größer ${R.dslSchwelle} Stück. DSL-Quote = DSL-Neuverträge / (Postpaid „normal“ + VVL).`,
+      `Der Mitarbeiter erhält ${eur(R.ppBetrag)} je o2 Postpaid-Neuvertrag ${gr(R.ppSchwelle)}.`,
+      `Wenn die DSL-Quote größer ${pf(R.dslSoll)} ist, erhält der Mitarbeiter ${eur(R.dslBetragHoch)} je DSL-Neuvertrag ${gr(R.dslSchwelle)}, sonst ${eur(R.dslBetragNiedrig)} je DSL-Neuvertrag ${gr(R.dslSchwelle)}. DSL-Quote = DSL-Neuverträge / (Postpaid „normal“ + VVL).`,
       `Der Mitarbeiter erhält je Urlaubstag und Krankheitstag ${eur(R.abwBetrag)} Provisionsauszahlung.`,
       'Mündliche Nebenabreden zu dieser Abrechnung bestehen nicht. Jede Änderung der Abrechnung muss schriftlich vereinbart werden.',
       `FIXPROVISION: Der Mitarbeiter erhält mindestens ${eur(R.fix)} PROVISION FIX pro Monat, auch wenn die Provisionszahlung aus Vertriebszahlen und Qualitätszielen nicht erreicht wird.`
     ];
+    if (inp && inp.einstiegsfrei) L.splice(L.length - 1, 0, 'Alle fünf monatlichen Qualitätsziele des Shops wurden erreicht: Postpaid und DSL werden in diesem Monat ab dem ersten Vertrag provisioniert (keine Einstiegsschwelle).');
+    return L;
   }
 
   function calc(inp, R) {
+    R = effR(inp, R);
     const po = n(inp.po), kombi = n(inp.kombi), kombiData = n(inp.kombiData), vvl = n(inp.vvl);
     const dsl = n(inp.dsl), dslVvl = n(inp.dslVvl), schutzOnline = n(inp.schutzOnline), tv = n(inp.tv);
     const handys = n(inp.handys), ks = n(inp.ks), marge = n(inp.zubMarge);
@@ -246,10 +253,10 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     const p = v => Math.round(v * 100) + ' %';
     const dslRel = Math.max(dsl - R.dslSchwelle, 0), dslOk = q.dsl > R.dslSoll;
     const rows = [
-      { row: 'pp', rich: `o2 **Postpaid** (Voice/Data) **größer ${R.ppSchwelle} Stück**`, quote: null, ist: q.poGes, rel: Math.max(q.poGes - R.ppSchwelle, 0), betrag: R.ppBetrag, dform: c => `MAX(${c}-${R.ppSchwelle},0)` },
+      { row: 'pp', rich: `o2 **Postpaid** (Voice/Data) **${gr(R.ppSchwelle)}**`, quote: null, ist: q.poGes, rel: Math.max(q.poGes - R.ppSchwelle, 0), betrag: R.ppBetrag, dform: c => `MAX(${c}-${R.ppSchwelle},0)` },
       { row: 'ks', rich: `Komplettschutz ab der ${R.ksAb}. Versicherung ${R.ksBetrag}€`, quote: q.ks, ist: ks, rel: Math.max(ks - (R.ksAb - 1), 0), betrag: R.ksBetrag, dform: c => `MAX(${c}-${R.ksAb - 1},0)` },
-      { row: 'dsl1', rich: `je **o2 DSL** Neuvertrag **größer ${R.dslSchwelle} Stück**, DSL-Quote bis ${p(R.dslSoll)}`, quote: q.dsl, ist: dsl, rel: dslOk ? 0 : dslRel, betrag: R.dslBetragNiedrig, dform: (c, b) => `IF(${b}>${R.dslSoll},0,MAX(${c}-${R.dslSchwelle},0))` },
-      { row: 'dsl2', rich: `je **o2 DSL** Neuvertrag **größer ${R.dslSchwelle} Stück** & **größer ${p(R.dslSoll)}** DSL-Quote`, quote: q.dsl, ist: dsl, rel: dslOk ? dslRel : 0, betrag: R.dslBetragHoch, dform: (c, b) => `IF(${b}>${R.dslSoll},MAX(${c}-${R.dslSchwelle},0),0)` },
+      { row: 'dsl1', rich: `je **o2 DSL** Neuvertrag **${gr(R.dslSchwelle)}**, DSL-Quote bis ${p(R.dslSoll)}`, quote: q.dsl, ist: dsl, rel: dslOk ? 0 : dslRel, betrag: R.dslBetragNiedrig, dform: (c, b) => `IF(${b}>${R.dslSoll},0,MAX(${c}-${R.dslSchwelle},0))` },
+      { row: 'dsl2', rich: `je **o2 DSL** Neuvertrag **${gr(R.dslSchwelle)}** & **größer ${p(R.dslSoll)}** DSL-Quote`, quote: q.dsl, ist: dsl, rel: dslOk ? dslRel : 0, betrag: R.dslBetragHoch, dform: (c, b) => `IF(${b}>${R.dslSoll},MAX(${c}-${R.dslSchwelle},0),0)` },
       { row: 'dslvvl', rich: `je **O2 DSL VVL ab der ersten**`, quote: null, ist: dslVvl, rel: dslVvl, betrag: R.dslVvlBetrag, dform: c => c },
       { row: 'vvl', rich: `o2 **VVL** größer **${R.vvlSchwelle} Stück**`, quote: null, ist: vvl, rel: Math.max(vvl - R.vvlSchwelle, 0), betrag: R.vvlBetrag, dform: c => `MAX(${c}-${R.vvlSchwelle},0)` },
       { row: 'zub', rich: `jeder Euro Zubehör Marge **größer ${e0(R.zubSchwelle)} Zubehör Marge** wird mit ${Math.round(R.zubAnteil * 100)}% Provision vergütet`, quote: null, ist: marge, rel: marge > R.zubSchwelle ? (marge - R.zubSchwelle) * R.zubAnteil : 0, betrag: 1, euro: true, dform: c => `IF(${c}>${R.zubSchwelle},(${c}-${R.zubSchwelle})*${R.zubAnteil},0)` },
@@ -416,7 +423,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     if (res.fixGreift) cell('F' + (r + 1), `Fixprovision greift (berechnet ${eur(res.brutto)})`, { fill: 'gr', size: 8, h: 'right', border: false });
     r += 4;
     cell('A' + r, 'Regularien:', { bold: true, size: 9, underline: true, color: 'FF1F4E79' }); r++;
-    regularien(R).forEach((t, i, arr) => {
+    regularien(R, inp).forEach((t, i, arr) => {
       ws.mergeCells(`A${r}:F${r}`);
       cell('A' + r, t, { size: 8, color: 'FF1F4E79', wrap: true, bold: i === arr.length - 1, fill: 'l', border: false });
       ws.getRow(r).height = t.length > 160 ? 24 : 13; r++;
@@ -597,7 +604,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     // Regularien
     y = gy + gh + 4.5;
     const BLU = [31, 78, 121];
-    const regs = regularien(R);
+    const regs = regularien(R, inp);
     doc.setFont(F, 'normal'); doc.setFontSize(5.3);
     const lines = regs.map((t, i) => doc.splitTextToSize(t, X[6] - X[0] - 2));
     const hReg = 5 + lines.reduce((s, l) => s + l.length * 2.9, 0) + 1;
@@ -1473,7 +1480,7 @@ const PROFILES = {
   o2: {
     id: 'o2', prefix: 'provi', title: 'o2 Shops', core: window.Provi, BLANK: O2_BLANK, GROUPS: O2_GROUPS, RULE_GROUPS: O2_RULE_GROUPS, SL_DEFAULTS: O2_SL_DEFAULTS,
     GS_LABELS: { werb: 'Werbeversprechen', pencil: 'Pencil Selling', marketing: 'Telefonie', tv: 'o2 TV', os: 'Online-Schutz' },
-    features: { teilzeit: true }, pushLabel: 'Push-Provision', telField: 'marketing',
+    features: { teilzeit: true, einstieg: true }, pushLabel: 'Push-Provision', telField: 'marketing',
     chips: (res, R) => [[`DSL ${pf(res.q.dsl)}`, res.q.dsl > R.dslSoll ? 'ok' : 'no'], [`KS ${pf(res.q.ks)}`]],
     kpis: [
       { h: 'PO', v: (i, r) => show(r.q.poGes) }, { h: 'VVL', v: i => show(i.vvl) }, { h: 'DSL', v: i => show(i.dsl) }, { h: 'KS', v: i => show(i.ks) },
@@ -1608,6 +1615,7 @@ function Editor({ inp, R, onPatch, onReset, onBack, onXlsx, onPdf, busy, importe
           <div className="card">
             <h2>Mitarbeiter</h2>
             {CUR.features.teilzeit && <label className="check" style={{ marginBottom: 12 }}><input type="checkbox" checked={!!inp.teilzeit} onChange={e => onPatch({ teilzeit: e.target.checked })} /> Azubi / Teilzeit (Ziel {R.tvSollTZ} TV, {R.osSollTZ} Online-Schutz)</label>}
+            {CUR.features.einstieg && <label className="check" style={{ marginBottom: 12 }}><input type="checkbox" checked={!!inp.einstiegsfrei} onChange={e => onPatch({ einstiegsfrei: e.target.checked })} /> Alle 5 Qualitätsziele des Shops erreicht (Postpaid und DSL ab dem 1. Vertrag, keine Einstiegsschwelle)</label>}
             <div className="grid">
               <Field label="Name (Abrechnung)" type="text" value={inp.name} onChange={up('name')} />
               <Field label="Vor- und Nachname (Vereinbarung)" type="text" value={inp.vollerName} onChange={up('vollerName')} />
@@ -1689,6 +1697,7 @@ function App() {
   const [ov, setOv] = useState(() => load(pk('ov'), {}));
   const [slSet, setSlSet] = useState(() => load(pk('sl'), CUR.SL_DEFAULTS));
   const [tzSet, setTzSet] = useState(() => load(pk('tz'), {}));
+  const [esSet, setEsSet] = useState(() => load(pk('es'), {})); // je Monat|Mitarbeiter: alle 5 Qualitätsziele erreicht
   const [manual, setManual] = useState(() => load(pk('manual'), { ...CUR.BLANK, name: '', vollerName: '' }));
   const [edit, setEdit] = useState(null); // sheet-Name | '__manual'
   const [busy, setBusy] = useState('');
@@ -1704,6 +1713,7 @@ function App() {
   useEffect(() => save(pk('ov'), ov), [ov]);
   useEffect(() => save(pk('sl'), slSet), [slSet]);
   useEffect(() => save(pk('tz'), tzSet), [tzSet]);
+  useEffect(() => save(pk('es'), esSet), [esSet]);
   useEffect(() => save(pk('manual'), manual), [manual]);
 
   // Beim ersten Öffnen in einem neuen Kalendermonat automatisch auf den aktuellen Monat wechseln.
@@ -1741,7 +1751,7 @@ function App() {
       const base = { ...CUR.BLANK, ...row.inp, ...(tel ? { [CUR.telField]: tel.tel } : {}), ...(dne ? { werb: dne.werb } : {}) };
       const sl = slSet[e.sheet] || {};
       const inp = { ...base, name: e.sheet, vollerName: e.fullName, ...shared, ...(o.fields || {}),
-        teilzeit: !!tzSet[e.sheet], shopleiter: !!sl.on, slRate1: sl.r1 ?? '', slRate2: sl.r2 ?? '', slZiel: (o.fields || {}).slZiel ?? sl.ziel ?? '', slIst: (o.fields || {}).slIst ?? '' };
+        teilzeit: !!tzSet[e.sheet], einstiegsfrei: !!esSet[key(e.sheet)], shopleiter: !!sl.on, slRate1: sl.r1 ?? '', slRate2: sl.r2 ?? '', slZiel: (o.fields || {}).slZiel ?? sl.ziel ?? '', slIst: (o.fields || {}).slIst ?? '' };
       const include = o.include ?? row.active;
       const todo = CUR.todo(inp, row, data);
       if (inp.shopleiter && !(Number(inp.slZiel) > 0)) todo.push({ t: 'Shopleiter: Margenziel fehlt' });
@@ -1752,22 +1762,24 @@ function App() {
       const sent = o.sent || null;
       return { e, row, inp, include, todo: todoF, tel, credited, sent, sentChanged: !!(sent && Math.abs((sent.total || 0) - res0.total) > 0.004), edited: !!(o.fields && Object.keys(o.fields).some(k => !['sonderBetrag', 'sonderText', 'slZiel', 'slIst', 'notiz'].includes(k))), res: res0 };
     });
-  }, [data, meta, ov, R, slSet, tzSet]);
+  }, [data, meta, ov, R, slSet, tzSet, esSet]);
   const chosen = list.filter(x => x.include);
   const sum = chosen.reduce((s, x) => s + x.res.total, 0);
 
   const patchSl = (sheet, p) => {
     const s = {}; const month = {};
     if ('teilzeit' in p) setTzSet(x => ({ ...x, [sheet]: !!p.teilzeit }));
+    if ('einstiegsfrei' in p) setEsSet(x => ({ ...x, [key(sheet)]: !!p.einstiegsfrei }));
     if ('shopleiter' in p) s.on = p.shopleiter;
     if ('slRate1' in p) s.r1 = p.slRate1;
     if ('slRate2' in p) s.r2 = p.slRate2;
     if ('slZiel' in p) { s.ziel = p.slZiel; month.slZiel = p.slZiel; }
     if ('slIst' in p) month.slIst = p.slIst;
     if (Object.keys(s).length) setSlSet(x => ({ ...x, [sheet]: { r1: '5', r2: '10', ...(x[sheet] || {}), ...s } }));
-    const rest = Object.fromEntries(Object.entries(p).filter(([k]) => !['teilzeit', 'shopleiter', 'slRate1', 'slRate2'].includes(k)));
+    const rest = Object.fromEntries(Object.entries(p).filter(([k]) => !['teilzeit', 'einstiegsfrei', 'shopleiter', 'slRate1', 'slRate2'].includes(k)));
     if (Object.keys(rest).length) patch(sheet, { fields: rest });
   };
+  const setEsAll = v => setEsSet(x => { const n = { ...x }; list.forEach(l => { n[key(l.e.sheet)] = v; }); return n; });
   const patch = (sheet, p) => setOv(s => { const k = key(sheet); const cur = s[k] || {}; return { ...s, [k]: { ...cur, ...('include' in p ? { include: p.include } : {}), ...('sent' in p ? { sent: p.sent } : {}), fields: { ...(cur.fields || {}), ...(p.fields || {}) } } }; });
   const [mailDlg, setMailDlg] = useState(null);
   const [mailSet, setMailSet] = useState(() => load(pk('mail'), {}));
@@ -1835,7 +1847,7 @@ function App() {
       zip.file(`Uebersicht_${safe(meta.monat)}_${meta.jahr}.xlsx`, await wb.xlsx.writeBuffer());
       return zip.generateAsync({ type: 'uint8array' });
   }
-  const backupObj = () => ({ app: 'hetec-provisionsabrechnung', profil: CUR.id, version: 1, erstellt: new Date().toISOString(), data, meta, ov, slSet, tzSet, mailSet, R, manual });
+  const backupObj = () => ({ app: 'hetec-provisionsabrechnung', profil: CUR.id, version: 1, erstellt: new Date().toISOString(), data, meta, ov, slSet, tzSet, esSet, mailSet, R, manual });
   const backupName = () => `Sicherung_Provision_${CUR.id}_${safe(meta.monat)}_${meta.jahr}_${new Date().toISOString().slice(0, 10)}.json`;
   function saveBackup() {
     download(new Blob([JSON.stringify(backupObj(), null, 1)], { type: 'application/json' }), backupName());
@@ -1852,6 +1864,7 @@ function App() {
       if (b.ov) setOv(b.ov);
       if (b.slSet) setSlSet(b.slSet);
       if (b.tzSet) setTzSet(b.tzSet);
+      if (b.esSet) setEsSet(b.esSet);
       if (b.mailSet) setMailSet(b.mailSet);
       if (b.R) setR({ ...CUR.core.DEFAULT_RULES, ...b.R });
       if (b.manual) setManual(b.manual);
@@ -1979,6 +1992,10 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
           <div className="tablehead">
             <h2>{meta.monat} {meta.jahr}</h2>
             <span>{chosen.length} von {list.length} ausgewählt · {chosen.filter(x => x.todo.length).length} mit Handlungsbedarf · <span className="okc">{chosen.filter(x => x.sent).length} versendet</span> · Auszahlung gesamt <b>{eur(sum)}</b></span>
+            {CUR.features.einstieg && <span>
+              <button className="btn-s" title="Alle 5 Qualitätsziele erreicht: bei allen Mitarbeitern keine Einstiegsschwelle" onClick={() => setEsAll(true)}>Alle: Ziele erreicht</button>{' '}
+              <button className="btn-s" title="Einstiegsschwelle gilt bei allen Mitarbeitern" onClick={() => setEsAll(false)}>Alle: Schwelle gilt</button>
+            </span>}
           </div>
           <div className="scroll">
             <table className="list">
@@ -1999,6 +2016,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
                         <strong>{x.e.fullName}</strong>
                         <span className="toggles">
                           {CUR.features.teilzeit && <label className="tgl"><input type="checkbox" checked={!!i.teilzeit} onChange={ev => patchSl(x.e.sheet, { teilzeit: ev.target.checked })} />Azubi/TZ</label>}
+                          {CUR.features.einstieg && <label className="tgl" title="Alle 5 Qualitätsziele des Shops erreicht: Postpaid und DSL ab dem 1. Vertrag, keine Einstiegsschwelle"><input type="checkbox" checked={!!i.einstiegsfrei} onChange={ev => patchSl(x.e.sheet, { einstiegsfrei: ev.target.checked })} />Ziele erreicht</label>}
                           <label className="tgl"><input type="checkbox" checked={!!i.shopleiter} onChange={ev => patchSl(x.e.sheet, { shopleiter: ev.target.checked })} />Shopleiter</label>
                           {x.sent && <small className={'tag ' + (x.sentChanged ? 'sentwarn' : 'sent')} title={`An ${x.sent.to} am ${new Date(x.sent.at).toLocaleString('de-DE')} · ${eur(x.sent.total)}`}>{x.sentChanged ? `✓ versendet ${kurzDatum(x.sent.at)} – Betrag geändert` : `✓ versendet ${kurzDatum(x.sent.at)}`}</small>}
                           {x.edited && <small className="tag">bearbeitet</small>}
