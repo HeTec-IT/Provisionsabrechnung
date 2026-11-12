@@ -177,6 +177,15 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
 .modal-act{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
 .modal .hint{color:var(--muted);font-size:.75rem}
 .warnline{margin:0;color:#7A5300;font-size:.82rem}
+.hist th:first-child,.hist td:first-child{position:sticky;left:0;background:#fff;z-index:1}
+.hist td.hc{cursor:pointer}.hist td.hc:hover{background:#EEF3FF}
+.hist td.avg,.hist th.avg{font-weight:700;background:#F7F9FC}
+.hist tfoot td{font-weight:700;border-top:2px solid var(--ink);background:#F7F9FC}
+.hist tfoot td:first-child{background:#F7F9FC}
+.hist .none{color:#9AA3B2}
+.histform{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.histform .field{min-width:150px}.histform .field.betrag{min-width:120px;max-width:160px}
+.histbar select{width:auto;min-width:110px}
 </style>
 </head><body><div id="root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -1690,6 +1699,165 @@ function Editor({ inp, R, onPatch, onReset, onBack, onXlsx, onPdf, busy, importe
   );
 }
 
+// ---------- Historie: alle Provisionen je Mitarbeiter und Monat, lokal im Browser ----------
+const histKey = (jahr, monat, sheet) => `${jahr}|${monat}|${sheet}`;
+const monIdx = m => MONATE.indexOf(m);
+const avgOf = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+const eurN = v => v == null ? '–' : eur(v);
+const parseBetrag = t => { const s = String(t).trim(); if (!s) return null; const v = s.includes(',') ? parseFloat(s.replace(/\./g, '').replace(',', '.')) : parseFloat(s); return isFinite(v) ? Math.round(v * 100) / 100 : null; };
+const colLetter = i => { let s = '', n = i + 1; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; };
+// Bereits versendete Abrechnungen (Versandnachweise) in die Historie übernehmen, ohne vorhandene Einträge zu überschreiben
+function histFromSent(ov, employees, hist) {
+  const out = { ...hist };
+  Object.entries(ov || {}).forEach(([k, o]) => {
+    const s = o && o.sent;
+    if (!s || typeof s.total !== 'number' || out[k]) return;
+    const [jahr, monat, ...r] = k.split('|'); const sheet = r.join('|');
+    if (!jahr || monIdx(monat) < 0 || !sheet) return;
+    const emp = (employees || []).find(e => e.sheet === sheet);
+    out[k] = { jahr, monat, sheet, name: emp ? emp.fullName : sheet, total: s.total, at: s.at || '', src: 'versand' };
+  });
+  return out;
+}
+
+function Historie({ hist, setHist, title, onBack, defJahr }) {
+  const all = useMemo(() => Object.values(hist), [hist]);
+  const jahre = useMemo(() => [...new Set(all.map(e => String(e.jahr)))].sort(), [all]);
+  const [jahr, setJahr] = useState(() => jahre.includes(String(defJahr)) ? String(defJahr) : (jahre[jahre.length - 1] || 'alle'));
+  const [f, setF] = useState({ name: '', monat: MONATE[new Date().getMonth()], jahr: String(defJahr), betrag: '' });
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const rows = useMemo(() => all.filter(e => jahr === 'alle' || String(e.jahr) === jahr), [all, jahr]);
+  const cols = useMemo(() => {
+    const m = new Map(); rows.forEach(e => m.set(e.jahr + '|' + e.monat, { jahr: String(e.jahr), monat: e.monat }));
+    return [...m.values()].sort((a, b) => a.jahr === b.jahr ? monIdx(a.monat) - monIdx(b.monat) : a.jahr.localeCompare(b.jahr));
+  }, [rows]);
+  const people = useMemo(() => {
+    const m = new Map();
+    rows.forEach(e => { const p = m.get(e.sheet); if (!p || (e.at || '') > p.at) m.set(e.sheet, { sheet: e.sheet, name: e.name || e.sheet, at: e.at || '' }); });
+    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  }, [rows]);
+  const cell = useMemo(() => { const m = {}; rows.forEach(e => { m[histKey(e.jahr, e.monat, e.sheet)] = e; }); return m; }, [rows]);
+  const names = useMemo(() => [...new Set(all.map(e => e.name || e.sheet))].sort((a, b) => a.localeCompare(b, 'de')), [all]);
+  const val = (p, c) => { const e = cell[histKey(c.jahr, c.monat, p.sheet)]; return e ? e.total : null; };
+  const rowVals = p => cols.map(c => val(p, c)).filter(v => v != null);
+  const colVals = c => people.map(p => val(p, c)).filter(v => v != null);
+  const allVals = rows.map(e => e.total);
+  const colLabel = c => c.monat.slice(0, 3) + ' ' + (jahr === 'alle' ? c.jahr : c.jahr.slice(2));
+
+  function editCell(p, c) {
+    const k = histKey(c.jahr, c.monat, p.sheet); const cur = hist[k];
+    const t = window.prompt(`${p.name} – ${c.monat} ${c.jahr}\nProvision in € (leer = Eintrag löschen)`, cur ? String(cur.total).replace('.', ',') : '');
+    if (t === null) return;
+    if (t.trim() === '') { setHist(h => { const n = { ...h }; delete n[k]; return n; }); setNote('Eintrag gelöscht.'); return; }
+    const v = parseBetrag(t);
+    if (v == null) { setNote('Ungültiger Betrag.'); return; }
+    setHist(h => ({ ...h, [k]: { jahr: c.jahr, monat: c.monat, sheet: p.sheet, name: (h[k] && h[k].name) || p.name, total: v, at: new Date().toISOString(), src: 'manuell' } }));
+    setNote('Eintrag geändert.');
+  }
+
+  function addEntry() {
+    const name = f.name.trim(), j = f.jahr.trim(), v = parseBetrag(f.betrag);
+    if (!name || !j || v == null) { setNote('Bitte Mitarbeiter, Monat, Jahr und Betrag ausfüllen.'); return; }
+    const known = all.find(e => (e.name || e.sheet).toLowerCase() === name.toLowerCase());
+    const sheet = known ? known.sheet : name;
+    setHist(h => ({ ...h, [histKey(j, f.monat, sheet)]: { jahr: j, monat: f.monat, sheet, name: known ? (known.name || known.sheet) : name, total: v, at: new Date().toISOString(), src: 'manuell' } }));
+    setJahr(j); setF(x => ({ ...x, betrag: '' }));
+    setNote(`${name}: ${f.monat} ${j} mit ${eur(v)} eingetragen.`);
+  }
+
+  async function exportXlsx() {
+    setBusy(true);
+    try {
+      const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Historie');
+      const nC = cols.length, nP = people.length, lastRow = nP + 1;
+      const A = colLetter(1), Z = colLetter(nC), cAvg = nC + 1, cSum = nC + 2, cCnt = nC + 3;
+      ws.addRow(['Mitarbeiter', ...cols.map(c => c.monat.slice(0, 3) + ' ' + c.jahr), 'Ø Provision', 'Summe', 'Monate']);
+      people.forEach((p, i) => {
+        const r = i + 2, vs = rowVals(p);
+        ws.addRow([p.name, ...cols.map(c => val(p, c)), { formula: `AVERAGE(${A}${r}:${Z}${r})`, result: avgOf(vs) || 0 }, { formula: `SUM(${A}${r}:${Z}${r})`, result: vs.reduce((s, v) => s + v, 0) }, { formula: `COUNT(${A}${r}:${Z}${r})`, result: vs.length }]);
+      });
+      const foot = ['Ø je Monat', ...cols.map((c, j) => { const L = colLetter(j + 1), vs = colVals(c); return { formula: `AVERAGE(${L}2:${L}${lastRow})`, result: avgOf(vs) || 0 }; }),
+        { formula: `AVERAGE(${A}2:${Z}${lastRow})`, result: avgOf(allVals) || 0 }, { formula: `SUM(${A}2:${Z}${lastRow})`, result: allVals.reduce((s, v) => s + v, 0) }, { formula: `COUNT(${A}2:${Z}${lastRow})`, result: allVals.length }];
+      ws.addRow(foot);
+      ws.addRow([]);
+      ws.addRow(['Gesamtdurchschnitt (alle Einträge)', { formula: `AVERAGE(${A}2:${Z}${lastRow})`, result: avgOf(allVals) || 0 }]);
+      ws.getColumn(1).width = 34;
+      for (let i = 2; i <= cCnt; i++) { ws.getColumn(i).width = i === cCnt ? 9 : 14; if (i !== cCnt) ws.getColumn(i).numFmt = '#,##0.00 "€"'; }
+      ws.getRow(1).font = { bold: true, name: 'Arial' };
+      ws.getRow(lastRow + 1).font = { bold: true, name: 'Arial' };
+      ws.getRow(lastRow + 3).font = { bold: true, name: 'Arial' };
+      ws.getRow(lastRow + 3).getCell(2).numFmt = '#,##0.00 "€"';
+      ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
+      const buf = await wb.xlsx.writeBuffer();
+      download(new Blob([buf], { type: XLSX_MIME }), `Provisionshistorie_${safe(title)}_${jahr}.xlsx`);
+      setNote('Excel exportiert.');
+    } catch (e) { setNote('Excel-Fehler: ' + e.message); }
+    setBusy(false);
+  }
+
+  return (
+    <div>
+      <div className="backup">
+        <span>Historie {title}: lokal im Browser gespeichert, es wird nichts hochgeladen</span>
+        <button className="btn-s" onClick={exportXlsx} disabled={!rows.length || busy}>Excel exportieren</button>
+        <button className="btn-s" onClick={onBack}>← Zurück</button>
+      </div>
+      {note && <p className="msg">{note}</p>}
+      <div className="card tablecard">
+        <div className="tablehead histbar">
+          <h2>Provisionshistorie</h2>
+          <span>Gesamtdurchschnitt <b>{eurN(avgOf(allVals))}</b> · {allVals.length} Einträge · {people.length} Mitarbeiter</span>
+          <label className="field inline"><span>Jahr</span>
+            <select value={jahr} onChange={e => setJahr(e.target.value)}>
+              {jahre.map(j => <option key={j} value={j}>{j}</option>)}
+              <option value="alle">Alle Jahre</option>
+            </select>
+          </label>
+        </div>
+        {rows.length ? (
+          <div className="scroll">
+            <table className="list hist">
+              <thead><tr>
+                <th>Mitarbeiter</th>
+                {cols.map(c => <th key={c.jahr + c.monat} className="r">{colLabel(c)}</th>)}
+                <th className="r avg">Ø Provision</th><th className="r">Summe</th><th className="r">Monate</th>
+              </tr></thead>
+              <tbody>
+                {people.map(p => { const vs = rowVals(p); return (
+                  <tr key={p.sheet}>
+                    <td className="who"><strong>{p.name}</strong></td>
+                    {cols.map(c => { const v = val(p, c); const e = cell[histKey(c.jahr, c.monat, p.sheet)]; return (
+                      <td key={c.jahr + c.monat} className={'r hc' + (v == null ? ' none' : '')} title={e ? `Quelle: ${e.src || 'Abrechnung'}${e.at ? ' · ' + new Date(e.at).toLocaleDateString('de-DE') : ''} · Klicken zum Ändern` : 'Klicken zum Eintragen'} onClick={() => editCell(p, c)}>{v == null ? '–' : eur(v)}</td>); })}
+                    <td className="r avg">{eurN(avgOf(vs))}</td>
+                    <td className="r">{eur(vs.reduce((s, v) => s + v, 0))}</td>
+                    <td className="r">{vs.length}</td>
+                  </tr>); })}
+              </tbody>
+              <tfoot><tr>
+                <td>Ø je Monat</td>
+                {cols.map(c => <td key={c.jahr + c.monat} className="r">{eurN(avgOf(colVals(c)))}</td>)}
+                <td className="r">{eurN(avgOf(allVals))}</td><td className="r">{eur(allVals.reduce((s, v) => s + v, 0))}</td><td className="r">{allVals.length}</td>
+              </tr></tfoot>
+            </table>
+          </div>
+        ) : <p className="empty" style={{ padding: 16 }}>Noch keine Einträge. Sie entstehen automatisch beim Erzeugen oder Versenden der Provisionen, oder über „In Historie speichern“ bzw. unten per Hand.</p>}
+      </div>
+      <div className="card">
+        <h2>Eintrag nachtragen</h2>
+        <div className="histform">
+          <label className="field"><span>Mitarbeiter</span><input list="histnames" value={f.name} placeholder="Vor- und Nachname" onChange={e => setF(x => ({ ...x, name: e.target.value }))} /></label>
+          <datalist id="histnames">{names.map(n => <option key={n} value={n} />)}</datalist>
+          <label className="field"><span>Monat</span><select value={f.monat} onChange={e => setF(x => ({ ...x, monat: e.target.value }))}>{MONATE.map(m => <option key={m} value={m}>{m}</option>)}</select></label>
+          <label className="field betrag"><span>Jahr</span><input inputMode="numeric" value={f.jahr} onChange={e => setF(x => ({ ...x, jahr: e.target.value }))} /></label>
+          <label className="field betrag"><span>Provision €</span><input inputMode="decimal" value={f.betrag} placeholder="0,00" onChange={e => setF(x => ({ ...x, betrag: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') addEntry(); }} /></label>
+          <button className="primary" onClick={addEntry}>Eintragen</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [R, setR] = useState(() => { const s = load(pk('rules'), {}); return s && s._v === CUR.core.RULES_VERSION ? { ...CUR.core.DEFAULT_RULES, ...s } : { ...CUR.core.DEFAULT_RULES, _v: CUR.core.RULES_VERSION }; });
   const [data, setData] = useState(() => load(pk('data'), null));
@@ -1785,6 +1953,18 @@ function App() {
   const [mailSet, setMailSet] = useState(() => load(pk('mail'), {}));
   useEffect(() => save(pk('mail'), mailSet), [mailSet]);
 
+  // Historie (lokal): je Jahr|Monat|Mitarbeiter ein Eintrag mit der Auszahlung
+  const [hist, setHist] = useState(() => load(pk('hist'), {}));
+  const [showHist, setShowHist] = useState(false);
+  useEffect(() => save(pk('hist'), hist), [hist]);
+  // Einmalig: bereits versendete Abrechnungen aus den Versandnachweisen übernehmen
+  useEffect(() => { setHist(h => histFromSent(ov, data ? data.employees : [], h)); }, []);
+  const recordMonth = xs => {
+    if (!xs.length || !meta.monat) return;
+    const at = new Date().toISOString(), jahr = String(meta.jahr), monat = meta.monat;
+    setHist(h => { const n = { ...h }; xs.forEach(x => { n[histKey(jahr, monat, x.e.sheet)] = { jahr, monat, sheet: x.e.sheet, name: x.inp.vollerName || x.e.sheet, total: x.res.total, brutto: x.res.brutto, sonder: x.res.sonder.betrag, at, src: 'Abrechnung' }; }); return n; });
+  };
+
   async function readFile(file) {
     setMsg(''); setBusy('import');
     try {
@@ -1847,7 +2027,7 @@ function App() {
       zip.file(`Uebersicht_${safe(meta.monat)}_${meta.jahr}.xlsx`, await wb.xlsx.writeBuffer());
       return zip.generateAsync({ type: 'uint8array' });
   }
-  const backupObj = () => ({ app: 'hetec-provisionsabrechnung', profil: CUR.id, version: 1, erstellt: new Date().toISOString(), data, meta, ov, slSet, tzSet, esSet, mailSet, R, manual });
+  const backupObj = () => ({ app: 'hetec-provisionsabrechnung', profil: CUR.id, version: 1, erstellt: new Date().toISOString(), data, meta, ov, slSet, tzSet, esSet, mailSet, R, manual, hist });
   const backupName = () => `Sicherung_Provision_${CUR.id}_${safe(meta.monat)}_${meta.jahr}_${new Date().toISOString().slice(0, 10)}.json`;
   function saveBackup() {
     download(new Blob([JSON.stringify(backupObj(), null, 1)], { type: 'application/json' }), backupName());
@@ -1868,6 +2048,7 @@ function App() {
       if (b.mailSet) setMailSet(b.mailSet);
       if (b.R) setR({ ...CUR.core.DEFAULT_RULES, ...b.R });
       if (b.manual) setManual(b.manual);
+      setHist(h => histFromSent(b.ov || {}, b.data ? b.data.employees : [], b.hist ? { ...b.hist } : h));
       setEdit(null);
       setMsg(`Sicherung „${file.name}“ geladen.`);
     } catch (e) { setMsg('Sicherung konnte nicht geladen werden: ' + e.message); }
@@ -1879,7 +2060,8 @@ function App() {
     setBusy('zip'); setMsg('');
     try {
       download(new Blob([await buildZip()], { type: 'application/zip' }), zipName());
-      setMsg(`${chosen.length} Abrechnungen erstellt.`);
+      recordMonth(chosen);
+      setMsg(`${chosen.length} Abrechnungen erstellt und in der Historie gespeichert.`);
     } catch (e) { setMsg('Fehler beim Erstellen: ' + e.message); }
     setBusy('');
   }
@@ -1912,7 +2094,8 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
       const eml = makeEml({ to: meta.mailTo || '', subject, text, html, files: [{ name: zipName(), mime: 'application/zip', bytes: zipBytes }] });
       download(new Blob([eml], { type: 'message/rfc822' }), `Provisionen_${safe(meta.monat)}_${meta.jahr}.eml`);
       try { await navigator.clipboard.writeText(text); } catch (e) {}
-      setMsg('E-Mail-Entwurf heruntergeladen: Datei öffnen, sie erscheint in Outlook mit ZIP im Anhang. Der Text ist zusätzlich in der Zwischenablage.');
+      recordMonth(chosen);
+      setMsg('E-Mail-Entwurf heruntergeladen: Datei öffnen, sie erscheint in Outlook mit ZIP im Anhang. Der Text ist zusätzlich in der Zwischenablage. Monat in der Historie gespeichert.');
     } catch (e) { setMsg('E-Mail konnte nicht erstellt werden: ' + e.message); }
     setBusy('');
   }
@@ -1933,12 +2116,15 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
         onXlsx={() => oneXlsx(x.inp)} onPdf={() => onePdf(x.inp)} /></div>);
   }
 
+  if (showHist) return (<div className="wrap"><Header /><Historie hist={hist} setHist={setHist} title={CUR.title} defJahr={meta.jahr} onBack={() => setShowHist(false)} /></div>);
+
   return (
     <div className="wrap">
       <Header />
       <div className="backup">
         <span>Sicherung: alle Werte, Kulanzen, Begründungen und Notizen</span>
         <button className="btn-s" onClick={refreshMonth} title="Stellt den aktuellen Kalendermonat ein, ohne frühere Abrechnungen oder Versandnachweise zu löschen">↻ Monat aktualisieren</button>
+        <button className="btn-s" onClick={() => setShowHist(true)} title="Alle Provisionen je Mitarbeiter und Monat mit Durchschnitten">Historie</button>
         <button className="btn-s" onClick={saveBackup} disabled={!data}>Sicherung speichern</button>
         <button className="btn-s" onClick={() => bakRef.current.click()}>Sicherung laden</button>
         <input ref={bakRef} type="file" accept=".json,application/json" hidden onChange={e => { const f = e.target.files[0]; if (f) loadBackup(f); e.target.value = ''; }} />
@@ -2069,6 +2255,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
           </div>
           <div className="gen">
             <button className="primary" onClick={generateAll} disabled={!!busy || !chosen.length}>{busy === 'zip' ? 'Erstelle Abrechnungen …' : `Provision generieren (${chosen.length})`}</button>
+            <button className="btn-s" style={{ width: 'auto', margin: 0, padding: '13px 18px' }} disabled={!chosen.length} onClick={() => { recordMonth(chosen); setMsg(`${chosen.length} Auszahlungen für ${meta.monat} ${meta.jahr} in der Historie gespeichert.`); }}>In Historie speichern</button>
             <small>ZIP mit PDF und Excel je Mitarbeiter, Übersicht und Sicherung.</small>
             <div className="mailbox">
               <label className="field inline"><span>Empfänger</span><input type="email" value={meta.mailTo || ''} placeholder="name@firma.de" onChange={e => setMeta(m => ({ ...m, mailTo: e.target.value }))} /></label>
@@ -2080,7 +2267,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
 
       {mailDlg && (() => { const x = list.find(l => l.e.sheet === mailDlg); if (!x) return null; return (
         <MailDialog x={x} meta={meta} R={R} mailAddr={mailSet[x.e.sheet]} onClose={() => setMailDlg(null)}
-          onSent={to => { setMailSet(m => ({ ...m, [x.e.sheet]: to })); patch(x.e.sheet, { sent: { at: new Date().toISOString(), to, total: x.res.total } }); setMailDlg(null); setMsg(`E-Mail-Entwurf für ${x.inp.vollerName} erstellt – Datei öffnen, sie erscheint in Outlook.`); }} />); })()}
+          onSent={to => { setMailSet(m => ({ ...m, [x.e.sheet]: to })); patch(x.e.sheet, { sent: { at: new Date().toISOString(), to, total: x.res.total } }); recordMonth([x]); setMailDlg(null); setMsg(`E-Mail-Entwurf für ${x.inp.vollerName} erstellt – Datei öffnen, sie erscheint in Outlook.`); }} />); })()}
       <Rules R={R} setR={setR} />
       <button className="ghost" onClick={() => setEdit('__manual')}>Einzelabrechnung ohne Import</button>
     </div>
