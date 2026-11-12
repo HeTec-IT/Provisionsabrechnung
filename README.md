@@ -15,6 +15,7 @@ Button „Historie“ (oben): Tabelle aller Provisionen je Mitarbeiter und Monat
 - Einträge entstehen automatisch bei „Provision generieren“, „Provisionen per E-Mail senden“ und dem E-Mail-Entwurf je Mitarbeiter, oder manuell über „In Historie speichern“.
 - Bereits versendete Abrechnungen (Versandnachweise) werden einmalig übernommen.
 - Zellen anklicken = Betrag ändern oder löschen. Unten können alte Monate nachgetragen werden.
+- „Historie importieren“ lädt eine JSON-Datei mit alten Monaten (je Bereich eine Datei, vorhandene Einträge werden nicht überschrieben).
 - Die Historie ist Teil der Sicherung (JSON).
 
 Alle Daten bleiben lokal im Browser (localStorage). Keine Daten werden hochgeladen, die Historie liegt nicht im Repository.

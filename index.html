@@ -1706,21 +1706,30 @@ const avgOf = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
 const eurN = v => v == null ? '–' : eur(v);
 const parseBetrag = t => { const s = String(t).trim(); if (!s) return null; const v = s.includes(',') ? parseFloat(s.replace(/\./g, '').replace(',', '.')) : parseFloat(s); return isFinite(v) ? Math.round(v * 100) / 100 : null; };
 const colLetter = i => { let s = '', n = i + 1; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; };
+// Gleicher Name (ohne Groß-/Kleinschreibung) = gleiche Zeile, auch wenn das Blatt anders heißt als beim Import
+const canonSheet = (hist, name, sheet) => {
+  const n = String(name || '').trim().toLowerCase(); if (!n) return sheet;
+  const e = Object.values(hist).find(x => String(x.name || '').trim().toLowerCase() === n);
+  return e ? e.sheet : sheet;
+};
 // Bereits versendete Abrechnungen (Versandnachweise) in die Historie übernehmen, ohne vorhandene Einträge zu überschreiben
 function histFromSent(ov, employees, hist) {
   const out = { ...hist };
   Object.entries(ov || {}).forEach(([k, o]) => {
     const s = o && o.sent;
-    if (!s || typeof s.total !== 'number' || out[k]) return;
+    if (!s || typeof s.total !== 'number') return;
     const [jahr, monat, ...r] = k.split('|'); const sheet = r.join('|');
     if (!jahr || monIdx(monat) < 0 || !sheet) return;
     const emp = (employees || []).find(e => e.sheet === sheet);
-    out[k] = { jahr, monat, sheet, name: emp ? emp.fullName : sheet, total: s.total, at: s.at || '', src: 'versand' };
+    const name = emp ? emp.fullName : sheet, sh = canonSheet(out, name, sheet), kk = histKey(jahr, monat, sh);
+    if (out[kk]) return;
+    out[kk] = { jahr, monat, sheet: sh, name, total: s.total, at: s.at || '', src: 'versand' };
   });
   return out;
 }
 
-function Historie({ hist, setHist, title, onBack, defJahr }) {
+function Historie({ hist, setHist, title, profil, onBack, defJahr }) {
+  const fileRef = useRef();
   const all = useMemo(() => Object.values(hist), [hist]);
   const jahre = useMemo(() => [...new Set(all.map(e => String(e.jahr)))].sort(), [all]);
   const [jahr, setJahr] = useState(() => jahre.includes(String(defJahr)) ? String(defJahr) : (jahre[jahre.length - 1] || 'alle'));
@@ -1766,6 +1775,24 @@ function Historie({ hist, setHist, title, onBack, defJahr }) {
     setNote(`${name}: ${f.monat} ${j} mit ${eur(v)} eingetragen.`);
   }
 
+  async function importFile(file) {
+    try {
+      const b = JSON.parse(await file.text());
+      if (b.app !== 'hetec-provisionsabrechnung-historie') throw new Error('Keine Historien-Datei.');
+      if (b.profil !== profil) throw new Error(`Die Datei gehört zum Bereich „${b.profil === 'fh' ? 'Fachhandel' : 'o2 Shops'}“. Bitte oben umschalten.`);
+      const out = { ...hist }; let n = 0, skip = 0, last = null;
+      Object.values(b.hist || {}).forEach(e => {
+        if (!e || monIdx(e.monat) < 0 || typeof e.total !== 'number' || !e.jahr) return;
+        const sheet = canonSheet(out, e.name, e.sheet), k = histKey(e.jahr, e.monat, sheet);
+        if (out[k]) { skip++; return; }
+        out[k] = { jahr: String(e.jahr), monat: e.monat, sheet, name: e.name || sheet, total: e.total, at: new Date().toISOString(), src: 'import' };
+        last = String(e.jahr); n++;
+      });
+      setHist(out); if (last) setJahr(last);
+      setNote(`${n} Einträge importiert${skip ? `, ${skip} schon vorhanden (nicht überschrieben)` : ''}.`);
+    } catch (e) { setNote('Import fehlgeschlagen: ' + e.message); }
+  }
+
   async function exportXlsx() {
     setBusy(true);
     try {
@@ -1800,6 +1827,8 @@ function Historie({ hist, setHist, title, onBack, defJahr }) {
     <div>
       <div className="backup">
         <span>Historie {title}: lokal im Browser gespeichert, es wird nichts hochgeladen</span>
+        <button className="btn-s" onClick={() => fileRef.current.click()}>Historie importieren</button>
+        <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={e => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ''; }} />
         <button className="btn-s" onClick={exportXlsx} disabled={!rows.length || busy}>Excel exportieren</button>
         <button className="btn-s" onClick={onBack}>← Zurück</button>
       </div>
@@ -1962,7 +1991,7 @@ function App() {
   const recordMonth = xs => {
     if (!xs.length || !meta.monat) return;
     const at = new Date().toISOString(), jahr = String(meta.jahr), monat = meta.monat;
-    setHist(h => { const n = { ...h }; xs.forEach(x => { n[histKey(jahr, monat, x.e.sheet)] = { jahr, monat, sheet: x.e.sheet, name: x.inp.vollerName || x.e.sheet, total: x.res.total, brutto: x.res.brutto, sonder: x.res.sonder.betrag, at, src: 'Abrechnung' }; }); return n; });
+    setHist(h => { const n = { ...h }; xs.forEach(x => { const nm = x.inp.vollerName || x.e.sheet, sh = canonSheet(n, nm, x.e.sheet); n[histKey(jahr, monat, sh)] = { jahr, monat, sheet: sh, name: nm, total: x.res.total, brutto: x.res.brutto, sonder: x.res.sonder.betrag, at, src: 'Abrechnung' }; }); return n; });
   };
 
   async function readFile(file) {
@@ -2116,7 +2145,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
         onXlsx={() => oneXlsx(x.inp)} onPdf={() => onePdf(x.inp)} /></div>);
   }
 
-  if (showHist) return (<div className="wrap"><Header /><Historie hist={hist} setHist={setHist} title={CUR.title} defJahr={meta.jahr} onBack={() => setShowHist(false)} /></div>);
+  if (showHist) return (<div className="wrap"><Header /><Historie hist={hist} setHist={setHist} title={CUR.title} profil={CUR.id} defJahr={meta.jahr} onBack={() => setShowHist(false)} /></div>);
 
   return (
     <div className="wrap">
