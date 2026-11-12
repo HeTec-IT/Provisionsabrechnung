@@ -6,7 +6,7 @@ PWA für die monatliche Provisionsabrechnung (o2).
 2. Telefonie-Excel (WOBIS) ablegen
 3. DNE-Excel (Werbeversprechen, Spalte A „Nachname Vorname“, Spalte D %) ablegen – ersetzt den Werbeversprechen-Wert
 4. Prüfen, Sonderprovision / Shopleiter / Gutschriften eintragen
-5. „Provision generieren“ (ZIP) oder „Provisionen per E-Mail senden“ (Outlook-Entwurf)
+5. „Provision generieren“ (ZIP) oder „Per E-Mail senden“ (Outlook-Entwurf). Pro Mitarbeiter: PDF, E-Mail, Unterschrift; „⋯“ öffnet Bearbeiten und Optionen (Azubi/TZ, Einstiegsschwelle, Shopleiter).
 
 ## Unterschrift am Handy
 

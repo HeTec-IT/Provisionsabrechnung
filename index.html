@@ -196,6 +196,68 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
 .sigarea>span{position:absolute;left:12px;top:8px;color:#9AA3B2;font-size:.8rem;pointer-events:none}
 .sigpad{display:block;width:100%;height:170px;touch-action:none;border-radius:10px}
 .sigbtns{display:flex;justify-content:flex-end;margin:6px 0 10px}
+
+/* Layout: kompakte Tabelle */
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;margin:6px 0 14px}
+.topbar h1{margin:0;font-size:1.7rem;font-weight:700;letter-spacing:-.01em}
+.topbar h1 .mode{font-size:.9rem;font-weight:600;color:var(--blue);vertical-align:middle;margin-left:8px;background:#E8EEFF;padding:3px 10px;border-radius:6px}
+.topbtns{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto;align-items:center}
+.topbtns .btn-s,.tbfields .btn-s{display:inline-block;width:auto;margin:0;padding:8px 14px;font-size:.85rem}
+.menu{position:relative}
+.menu summary{list-style:none;cursor:pointer}
+.menu summary::-webkit-details-marker{display:none}
+.menu .pop{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(10,31,68,.15);padding:6px;display:flex;flex-direction:column;gap:2px;min-width:230px;z-index:20}
+.menu .pop button{background:none;border:0;text-align:left;padding:9px 12px;border-radius:6px;color:var(--ink);font-size:.88rem}
+.menu .pop button:hover:not(:disabled){background:#EEF3FF}
+.menu .pop button:disabled{opacity:.5}
+.chips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 12px}
+.fchip{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;min-width:0}
+.fchip:hover,.fchip.over{border-color:var(--blue);background:#F2F6FF}
+.fchip.none{border-style:dashed;border-color:#9AAAC4}
+.fchip:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.fchip .fdot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex-shrink:0}
+.fchip.none .fdot{background:#B8C2D3}
+.fchip .ftxt{min-width:0;flex:1}
+.fchip .ftxt small{display:block;color:var(--muted);font-size:.75rem}
+.fchip .ftxt b{display:block;font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fchip .fact{color:var(--blue);font-weight:600;font-size:.85rem}
+@media (max-width:900px){.chips{grid-template-columns:1fr}}
+.tablehead2{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:14px 16px}
+.tablehead2 h2{margin:0;font-size:1.2rem}
+.tablehead2 .sub{color:var(--muted);font-size:.85rem}
+.tbfields{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-left:auto}
+.tbfields label{display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted)}
+.tbfields input,.tbfields select{font:inherit;font-size:.88rem;color:var(--ink);padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#F7F9FC}
+.tbfields input.w-y{width:64px}.tbfields input.w-o{width:120px}.tbfields input.w-d{width:100px}
+.list.c th{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;background:#F5F7FB;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.list.c td{padding:10px 6px;vertical-align:middle}
+.list.c td.who{min-width:260px}
+.list.c .who strong{display:inline;font-size:.95rem}
+.list.c .who strong.nm{cursor:pointer}
+.list.c .who strong.nm:hover{color:var(--blue)}
+.pill{display:inline-block;font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:middle}
+.pill.st-ready,.pill.st-sig{background:#E3F1E9;color:#0B5E30}
+.pill.st-todo{background:#FDECEA;color:#B42318}
+.pill.st-sent{background:#E4EBFB;color:#1239A6}
+.pill.st-warn{background:#FFF3D6;color:#7A5300}
+.list.c .who .todoln{display:block;color:var(--no);font-size:.78rem;margin-top:3px}
+.list.c .abz{margin-top:4px}
+.list.c td.sp{width:1%;white-space:nowrap}
+.list.c td.sp .mini{display:inline-block;width:88px;margin:0;padding:6px 8px;font-size:.85rem}
+.list.c td.sp .mini.an{display:block;width:150px;margin-top:4px}
+.list.c td.acts .btn-s{display:inline-block;width:auto;margin:0 0 0 6px;padding:7px 10px}
+.btn-s.dots{padding:7px 9px;color:var(--muted);line-height:0}
+.list.c tr.morerow td{background:#F6F8FC;padding:8px 6px 10px;border-bottom:1px solid #E4E8EF}
+.morebar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.morebar .btn-s{display:inline-block;width:auto;margin:0}
+.gen2{position:sticky;bottom:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:0 0 12px;box-shadow:0 -4px 16px rgba(10,31,68,.08)}
+.gen2 .gsum{color:var(--muted);font-size:.9rem}
+.gen2 .gsum strong{color:var(--ink);font-size:1.35rem;margin-left:8px;font-variant-numeric:tabular-nums}
+.gen2 .gact{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-left:auto}
+.gen2 .field.inline input{width:220px}
+.gen2 .primary{padding:11px 18px;font-size:.95rem}
+.gen2 .btn-s{display:inline-block;width:auto;margin:0;padding:10px 14px;font-size:.88rem}
+.primary.out{background:#fff;color:var(--blue);border:1px solid var(--blue)}
 </style>
 </head><body><div id="root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -1997,6 +2059,20 @@ async function parseSigPdf(file) {
   return o;
 }
 
+function FileChip({ label, info, title, loaded, busy, onFile }) {
+  const ref = useRef(); const [over, setOver] = useState(false);
+  return (
+    <div className={'fchip' + (loaded ? '' : ' none') + (over ? ' over' : '')} role="button" tabIndex={0} title={title}
+      onClick={() => ref.current.click()} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ref.current.click(); } }}
+      onDragOver={e => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
+      onDrop={e => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f) onFile(f); }}>
+      <input ref={ref} type="file" accept=".xlsx,.xlsm" hidden onChange={e => { const f = e.target.files[0]; if (f) onFile(f); e.target.value = ''; }} />
+      <span className="fdot" />
+      <span className="ftxt"><small>{label}</small><b>{busy ? 'Lese Datei …' : info}</b></span>
+      <span className="fact">{loaded ? 'Ersetzen' : 'Ablegen'}</span>
+    </div>);
+}
+
 function SignDialog({ x, meta, R, rq, relay, onRelay, onClose, onImport, onPoll, onUnmark }) {
   const impRef = useRef();
   const [cfg, setCfg] = useState(false);
@@ -2251,6 +2327,7 @@ function App() {
   const patch = (sheet, p) => setOv(s => { const k = key(sheet); const cur = s[k] || {}; return { ...s, [k]: { ...cur, ...('include' in p ? { include: p.include } : {}), ...('sent' in p ? { sent: p.sent } : {}), ...('sig' in p ? { sig: p.sig } : {}), fields: { ...(cur.fields || {}), ...(p.fields || {}) } } }; });
   const [mailDlg, setMailDlg] = useState(null);
   const [signDlg, setSignDlg] = useState(null);
+  const [more, setMore] = useState({});
   const [sigReq, setSigReq] = useState(() => load(pk('sigReq'), {}));
   const [relay, setRelay] = useState(loadRelay);
   const relayRef = useRef(relay);
@@ -2494,46 +2571,45 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
 
   if (showHist) return (<div className="wrap"><Header /><Historie hist={hist} setHist={setHist} title={CUR.title} profil={CUR.id} defJahr={meta.jahr} onBack={() => setShowHist(false)} /></div>);
 
+  const closeMenu = e => { const d = e.currentTarget.closest('details'); if (d) d.open = false; };
+  const metaFields = (
+    <div className="tbfields">
+      <label>Monat <select aria-label="Abrechnungsmonat" value={meta.monat} onChange={e => setMeta(m => ({ ...m, monat: e.target.value }))}>
+        <option value="" disabled>Monat wählen</option>
+        {MONATE.map(m => <option key={m} value={m}>{m}{data && !data.months.includes(m) ? ' (keine Daten)' : ''}</option>)}
+      </select></label>
+      <label>Jahr <input className="w-y" inputMode="numeric" aria-label="Jahr" value={meta.jahr} onChange={e => setMeta(m => ({ ...m, jahr: e.target.value }))} /></label>
+      <label>Ort <input className="w-o" aria-label="Ort (Vereinbarung)" placeholder="Ort" value={meta.ort} onChange={e => setMeta(m => ({ ...m, ort: e.target.value }))} /></label>
+      <label>Datum <input className="w-d" aria-label="Datum" value={meta.datum} onChange={e => setMeta(m => ({ ...m, datum: e.target.value }))} /></label>
+      {CUR.features.einstieg && list.length > 0 && <details className="menu"><summary className="btn-s">Alle: Einstiegsschwelle ▾</summary><div className="pop">
+        <button onClick={e => { closeMenu(e); setEsAll(true); }} title="Bei allen Mitarbeitern keine Einstiegsschwelle">Bei allen: keine Einstiegsschwelle</button>
+        <button onClick={e => { closeMenu(e); setEsAll(false); }} title="Bei allen Mitarbeitern gilt die Einstiegsschwelle">Bei allen: Einstiegsschwelle gilt</button>
+      </div></details>}
+    </div>);
+
   return (
     <div className="wrap">
-      <Header />
-      <div className="backup">
-        <span>Sicherung: alle Werte, Kulanzen, Begründungen und Notizen</span>
-        <button className="btn-s" onClick={refreshMonth} title="Stellt den aktuellen Kalendermonat ein, ohne frühere Abrechnungen oder Versandnachweise zu löschen">↻ Monat aktualisieren</button>
-        <button className="btn-s" onClick={() => setShowHist(true)} title="Alle Provisionen je Mitarbeiter und Monat mit Durchschnitten">Historie</button>
-        <button className="btn-s" onClick={() => sigRef.current.click()} title="Unterschriebene PDFs vom Handy einlesen (mehrere möglich)">Unterschriften einlesen</button>
-        <input ref={sigRef} type="file" accept=".pdf,application/pdf" multiple hidden onChange={e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) importSigs(fs); }} />
-        <button className="btn-s" onClick={saveBackup} disabled={!data}>Sicherung speichern</button>
-        <button className="btn-s" onClick={() => bakRef.current.click()}>Sicherung laden</button>
-        <input ref={bakRef} type="file" accept=".json,application/json" hidden onChange={e => { const f = e.target.files[0]; if (f) loadBackup(f); e.target.value = ''; }} />
+      <div className="topbar">
+        <h1>Provisionsabrechnung <span className="mode">{CUR.title}</span></h1>
+        <div className="topbtns">
+          <button className="btn-s" onClick={refreshMonth} title="Stellt den aktuellen Kalendermonat ein, ohne frühere Abrechnungen oder Versandnachweise zu löschen">↻ Monat aktualisieren</button>
+          <button className="btn-s" onClick={() => setShowHist(true)} title="Alle Provisionen je Mitarbeiter und Monat mit Durchschnitten">Historie</button>
+          <button className="btn-s" onClick={() => sigRef.current.click()} title="Unterschriebene PDFs vom Handy einlesen (mehrere möglich)">Unterschriften einlesen</button>
+          <input ref={sigRef} type="file" accept=".pdf,application/pdf" multiple hidden onChange={e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) importSigs(fs); }} />
+          <details className="menu"><summary className="btn-s">Sicherung ▾</summary><div className="pop">
+            <button onClick={e => { closeMenu(e); saveBackup(); }} disabled={!data} title="Alle Werte, Kulanzen, Begründungen und Notizen">Sicherung speichern</button>
+            <button onClick={e => { closeMenu(e); bakRef.current.click(); }}>Sicherung laden</button>
+          </div></details>
+          <input ref={bakRef} type="file" accept=".json,application/json" hidden onChange={e => { const f = e.target.files[0]; if (f) loadBackup(f); e.target.value = ''; }} />
+        </div>
       </div>
-      <div
-        className={'drop' + (drag ? ' over' : '')}
-        onDragOver={e => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
-        onDrop={e => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) readFile(f); }}
-        onClick={() => fileRef.current.click()} role="button" tabIndex={0}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileRef.current.click(); }}>
-        <input ref={fileRef} type="file" accept=".xlsx,.xlsm" hidden onChange={e => { const f = e.target.files[0]; if (f) readFile(f); e.target.value = ''; }} />
-        <strong>{busy === 'import' ? 'Lese Datei …' : data ? 'Neue Performance-Excel einlesen' : 'Performance-Excel hier ablegen'}</strong>
-        <span>{data ? `Aktuell: ${data.file} · ${data.employees.length} Mitarbeiter` : 'oder klicken, um die Monatsdatei auszuwählen'}</span>
-      </div>
-      <div className="drop small"
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) readTel(f); }}
-        onClick={() => telRef.current.click()} role="button" tabIndex={0}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') telRef.current.click(); }}>
-        <input ref={telRef} type="file" accept=".xlsx,.xlsm" hidden onChange={e => { const f = e.target.files[0]; if (f) readTel(f); e.target.value = ''; }} />
-        <strong>{busy === 'tel' ? 'Lese Datei …' : 'Telefonie-Excel (WOBIS) ablegen'}</strong>
-        <span>{data?.telefonie ? `Aktuell: ${data.telefonie.file} · ${data.telefonie.list.length} Personen` : 'Spalte A Name, Spalte B Telefonie – ersetzt den Marketingwert'}</span>
-      </div>
-      <div className="drop small"
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) readDne(f); }}
-        onClick={() => dneRef.current.click()} role="button" tabIndex={0}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') dneRef.current.click(); }}>
-        <input ref={dneRef} type="file" accept=".xlsx,.xlsm" hidden onChange={e => { const f = e.target.files[0]; if (f) readDne(f); e.target.value = ''; }} />
-        <strong>{busy === 'dne' ? 'Lese Datei …' : 'DNE-Excel (Werbeversprechen) ablegen'}</strong>
-        <span>{data?.dne ? `Aktuell: ${data.dne.file} · ${data.dne.list.length} Personen` : 'Spalte A „Nachname Vorname“, Spalte D DNE % – ersetzt den Werbeversprechen-Wert'}</span>
+      <div className="chips">
+        <FileChip label="Performance-Excel" loaded={!!data} busy={busy === 'import'} onFile={readFile}
+          info={data ? `${data.employees.length} Mitarbeiter · ${data.file}` : 'Monatsdatei ablegen oder klicken'} title={data ? data.file : 'Performance-Excel einlesen'} />
+        <FileChip label="Telefonie (WOBIS)" loaded={!!data?.telefonie} busy={busy === 'tel'} onFile={readTel}
+          info={data?.telefonie ? `${data.telefonie.list.length} Personen` : 'ablegen oder klicken'} title={data?.telefonie ? data.telefonie.file : 'Spalte A Name, Spalte B Telefonie – ersetzt den Marketingwert'} />
+        <FileChip label="DNE (Werbeversprechen)" loaded={!!data?.dne} busy={busy === 'dne'} onFile={readDne}
+          info={data?.dne ? `${data.dne.list.length} Personen` : 'ablegen oder klicken'} title={data?.dne ? data.dne.file : 'Spalte A „Nachname Vorname“, Spalte D DNE % – ersetzt den Werbeversprechen-Wert'} />
       </div>
       {msg && <p className="msg">{msg}</p>}
       {seedBox && (
@@ -2547,57 +2623,42 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
           </div>
         </div>)}
 
-      <div className="card">
-        <div className="grid meta">
-          <label className="field"><span>Abrechnungsmonat</span>
-            <select value={meta.monat} onChange={e => setMeta(m => ({ ...m, monat: e.target.value }))}>
-              <option value="" disabled>Monat wählen</option>
-              {MONATE.map(m => <option key={m} value={m}>{m}{data && !data.months.includes(m) ? ' (keine Daten)' : ''}</option>)}
-            </select>
-          </label>
-          <Field label="Jahr" value={meta.jahr} onChange={v => setMeta(m => ({ ...m, jahr: v }))} />
-          <Field label="Ort (Vereinbarung)" type="text" value={meta.ort} onChange={v => setMeta(m => ({ ...m, ort: v }))} />
-          <Field label="Datum" type="text" value={meta.datum} onChange={v => setMeta(m => ({ ...m, datum: v }))} />
-        </div>
-      </div>
+      {list.length === 0 && <div className="card"><div className="tablehead2"><h2>Abrechnungsmonat</h2>{metaFields}</div></div>}
 
       {list.length > 0 ? (
+        <>
         <div className="card tablecard">
-          <div className="tablehead">
+          <div className="tablehead2">
             <h2>{meta.monat} {meta.jahr}</h2>
-            <span>{chosen.length} von {list.length} ausgewählt · {chosen.filter(x => x.todo.length).length} mit Handlungsbedarf · <span className="okc">{chosen.filter(x => x.sent).length} versendet</span> · Auszahlung gesamt <b>{eur(sum)}</b></span>
-            {CUR.features.einstieg && <span>
-              <button className="btn-s" title="Bei allen Mitarbeitern keine Einstiegsschwelle" onClick={() => setEsAll(true)}>Alle: Einstiegsschwelle nein</button>{' '}
-              <button className="btn-s" title="Bei allen Mitarbeitern gilt die Einstiegsschwelle" onClick={() => setEsAll(false)}>Alle: Einstiegsschwelle ja</button>
-            </span>}
+            <span className="sub">{chosen.length} von {list.length} ausgewählt · {chosen.filter(x => x.todo.length).length} mit Handlungsbedarf · <span className="okc">{chosen.filter(x => x.sent).length} versendet</span> · {chosen.filter(x => x.sig && !x.sigChanged).length} unterschrieben</span>
+            {metaFields}
           </div>
           <div className="scroll">
-            <table className="list">
+            <table className="list c">
               <thead><tr>
                 <th></th><th>Mitarbeiter</th>
                 {CUR.kpis.map(k => <th key={k.h} className="n" title={k.title || ''}>{k.h}</th>)}
-                <th>Sonderprovision</th><th className="r">Auszahlung</th><th></th>
+                <th>Sonder €</th><th className="r">Auszahlung</th><th></th>
               </tr></thead>
               <tbody>
                 {list.map(x => {
                   const i = x.inp, f = (ov[key(x.e.sheet)] || {}).fields || {};
-                  const pc = v => v === '' ? '–' : num(v) + '%';
+                  const open = !!more[x.e.sheet];
+                  const pills = [];
+                  if (x.include && x.todo.length) pills.push(['st-todo', 'Handlungsbedarf', 'Siehe Hinweis unter dem Namen']);
+                  if (x.sent) pills.push([x.sentChanged ? 'st-warn' : 'st-sent', x.sentChanged ? `Versendet ${kurzDatum(x.sent.at)} · Betrag geändert` : `Versendet ${kurzDatum(x.sent.at)}`, `An ${x.sent.to} am ${new Date(x.sent.at).toLocaleString('de-DE')} · ${eur(x.sent.total)}`]);
+                  if (x.sig) pills.push([x.sigChanged ? 'st-warn' : 'st-sig', x.sigChanged ? `Unterschrieben ${kurzDatum(x.sig.at)} · Betrag geändert` : `Unterschrieben ${kurzDatum(x.sig.at)}`, `Unterschrift vom ${new Date(x.sig.at).toLocaleString('de-DE')} · ${eur(x.sig.total)}`]);
+                  if (!pills.length && x.include) pills.push(['st-ready', 'Bereit', '']);
                   return (
                     <React.Fragment key={x.e.sheet}>
                     <tr className={(x.include ? '' : 'off') + (i.shopleiter ? ' hassl' : '') + (x.sent && !x.sentChanged ? ' issent' : '')}>
-                      <td className="cb">{x.todo.length > 0 && x.include && <span className="dot" title="Handlungsbedarf" />}<input type="checkbox" aria-label={'Einbeziehen: ' + x.e.fullName} checked={x.include} onChange={ev => patch(x.e.sheet, { include: ev.target.checked })} /></td>
+                      <td className="cb"><input type="checkbox" aria-label={'Einbeziehen: ' + x.e.fullName} checked={x.include} onChange={ev => patch(x.e.sheet, { include: ev.target.checked })} /></td>
                       <td className="who">
-                        <strong>{x.e.fullName}</strong>
-                        <span className="toggles">
-                          {CUR.features.teilzeit && <label className="tgl"><input type="checkbox" checked={!!i.teilzeit} onChange={ev => patchSl(x.e.sheet, { teilzeit: ev.target.checked })} />Azubi/TZ</label>}
-                          {CUR.features.einstieg && <label className="tgl" title="Haken = Einstiegsschwelle gilt. Ohne Haken: Postpaid und DSL ab dem 1. Vertrag"><input type="checkbox" checked={!i.einstiegsfrei} onChange={ev => patchSl(x.e.sheet, { einstiegsfrei: !ev.target.checked })} />Einstiegsschwelle</label>}
-                          <label className="tgl"><input type="checkbox" checked={!!i.shopleiter} onChange={ev => patchSl(x.e.sheet, { shopleiter: ev.target.checked })} />Shopleiter</label>
-                          {x.sent && <small className={'tag ' + (x.sentChanged ? 'sentwarn' : 'sent')} title={`An ${x.sent.to} am ${new Date(x.sent.at).toLocaleString('de-DE')} · ${eur(x.sent.total)}`}>{x.sentChanged ? `✓ versendet ${kurzDatum(x.sent.at)} – Betrag geändert` : `✓ versendet ${kurzDatum(x.sent.at)}`}</small>}
-                          {x.sig && <small className={'tag ' + (x.sigChanged ? 'sentwarn' : 'sent')} title={`Unterschrift vom ${new Date(x.sig.at).toLocaleString('de-DE')} · ${eur(x.sig.total)}`}>{x.sigChanged ? `✓ unterschrieben ${kurzDatum(x.sig.at)} – Betrag geändert` : `✓ unterschrieben ${kurzDatum(x.sig.at)}`}</small>}
-                          {x.edited && <small className="tag">bearbeitet</small>}
-                          {x.inp.notiz && <small className="tag note" title={x.inp.notiz}>Notiz</small>}
-                          {!x.row.active && <small className="tag">keine Werte</small>}
-                        </span>
+                        <strong className="nm" title="Bearbeiten" onClick={() => setEdit(x.e.sheet)}>{x.e.fullName}</strong>
+                        {pills.map(p => <span key={p[1]} className={'pill ' + p[0]} title={p[2]}>{p[1]}</span>)}
+                        {x.edited && <small className="tag">bearbeitet</small>}
+                        {x.inp.notiz && <small className="tag note" title={x.inp.notiz}>Notiz</small>}
+                        {!x.row.active && <small className="tag">keine Werte</small>}
                         {(() => {
                           const SH = CUR.GS_LABELS;
                           const ab = x.res.qual.filter(q => q.betrag < 0 && !x.credited(q.row));
@@ -2609,20 +2670,19 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
                             </span>;
                           })}</div>);
                         })()}
-                        {x.todo.length > 0 && <small className="todo">Handlungsbedarf: {x.todo.join(', ')}</small>}
+                        {x.todo.length > 0 && <span className="todoln">{x.todo.join(' · ')}</span>}
                       </td>
                       {CUR.kpis.map(k => <td key={k.h} className={'n' + (k.q && (x.res.qual.find(q => q.row === k.q) || {}).betrag < 0 && !x.credited(k.q) ? ' bad' : '')}>{k.v(i, x.res)}</td>)}
                       <td className="sp">
                         <input className="mini" inputMode="decimal" aria-label="Sonderprovision Betrag" value={f.sonderBetrag ?? ''} placeholder="€" onChange={ev => patch(x.e.sheet, { fields: { sonderBetrag: ev.target.value } })} />
-                        <input className="mini" aria-label="Anlass Sonderprovision" value={f.sonderText ?? ''} placeholder="Anlass" onChange={ev => patch(x.e.sheet, { fields: { sonderText: ev.target.value } })} />
+                        {(f.sonderBetrag || f.sonderText) ? <input className="mini an" aria-label="Anlass Sonderprovision" value={f.sonderText ?? ''} placeholder="Anlass" onChange={ev => patch(x.e.sheet, { fields: { sonderText: ev.target.value } })} /> : null}
                       </td>
                       <td className="r pay"><strong>{eur(x.res.total)}</strong><small>Provision {eur(Math.max(x.res.brutto, R.fix))}{x.res.sl ? ' · SL ' + eur(x.res.sl.betrag) : ''}</small></td>
                       <td className="acts">
-                        <button className="btn-s" onClick={() => setEdit(x.e.sheet)}>Bearbeiten</button>
-                        <button className={'btn-s' + (x.inp.signImg ? ' sentbtn' : '')} onClick={() => onePdf(x.inp)} disabled={!!busy} title={x.inp.signImg ? 'PDF inklusive Unterschrift des Mitarbeiters' : ''}>{x.inp.signImg ? 'PDF ✍' : 'PDF'}</button>
+                        <button className={'btn-s' + (x.inp.signImg ? ' sentbtn' : '')} onClick={() => onePdf(x.inp)} disabled={!!busy} title={x.inp.signImg ? 'PDF inklusive Unterschrift des Mitarbeiters' : 'PDF erzeugen'}>{x.inp.signImg ? 'PDF ✍' : 'PDF'}</button>
                         <button className={'btn-s' + (x.sent ? ' sentbtn' : '')} onClick={() => setMailDlg(x.e.sheet)} disabled={!!busy}>{x.sent ? '✓ E-Mail' : 'E-Mail'}</button>
-                        <button className={'btn-s' + (x.sig && !x.sigChanged ? ' sentbtn' : '')} onClick={() => openSign(x.e.sheet)} disabled={!!busy} title="QR-Code: Mitarbeiter unterschreibt die Abrechnung am Handy">{x.sig && !x.sigChanged ? '✓ Unterschrift' : 'Unterschrift (QR)'}</button>
-                        {x.sent && <button className="link tiny" onClick={() => patch(x.e.sheet, { sent: null })}>Haken entfernen</button>}
+                        <button className={'btn-s' + (x.sig && !x.sigChanged ? ' sentbtn' : '')} onClick={() => openSign(x.e.sheet)} disabled={!!busy} title="QR-Code: Mitarbeiter unterschreibt die Abrechnung am Handy">{x.sig && !x.sigChanged ? '✓ Unterschrift' : 'Unterschrift'}</button>
+                        <button className="btn-s dots" aria-label={'Mehr für ' + x.e.fullName} aria-expanded={open} title="Bearbeiten und Optionen" onClick={() => setMore(m => ({ ...m, [x.e.sheet]: !m[x.e.sheet] }))}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.4" fill="currentColor"></circle><circle cx="8" cy="8" r="1.4" fill="currentColor"></circle><circle cx="13" cy="8" r="1.4" fill="currentColor"></circle></svg></button>
                       </td>
                     </tr>
                     {i.shopleiter && (
@@ -2638,21 +2698,34 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
                           </div>
                         </td>
                       </tr>)}
+                    {open && (
+                      <tr className="morerow"><td></td>
+                        <td colSpan={CUR.kpis.length + 4}>
+                          <div className="morebar">
+                            <button className="btn-s" onClick={() => setEdit(x.e.sheet)}>Bearbeiten</button>
+                            {CUR.features.teilzeit && <label className="tgl"><input type="checkbox" checked={!!i.teilzeit} onChange={ev => patchSl(x.e.sheet, { teilzeit: ev.target.checked })} />Azubi/TZ</label>}
+                            {CUR.features.einstieg && <label className="tgl" title="Haken = Einstiegsschwelle gilt. Ohne Haken: Postpaid und DSL ab dem 1. Vertrag"><input type="checkbox" checked={!i.einstiegsfrei} onChange={ev => patchSl(x.e.sheet, { einstiegsfrei: !ev.target.checked })} />Einstiegsschwelle</label>}
+                            <label className="tgl"><input type="checkbox" checked={!!i.shopleiter} onChange={ev => patchSl(x.e.sheet, { shopleiter: ev.target.checked })} />Shopleiter</label>
+                            {x.sent && <button className="link" onClick={() => patch(x.e.sheet, { sent: null })}>Versand-Haken entfernen</button>}
+                          </div>
+                        </td>
+                      </tr>)}
                     </React.Fragment>);
                 })}
               </tbody>
             </table>
           </div>
-          <div className="gen">
-            <button className="primary" onClick={generateAll} disabled={!!busy || !chosen.length}>{busy === 'zip' ? 'Erstelle Abrechnungen …' : `Provision generieren (${chosen.length})`}</button>
-            <button className="btn-s" style={{ width: 'auto', margin: 0, padding: '13px 18px' }} disabled={!chosen.length} onClick={() => { recordMonth(chosen); setMsg(`${chosen.length} Auszahlungen für ${meta.monat} ${meta.jahr} in der Historie gespeichert.`); }}>In Historie speichern</button>
-            <small>ZIP mit PDF und Excel je Mitarbeiter, Übersicht und Sicherung.</small>
-            <div className="mailbox">
-              <label className="field inline"><span>Empfänger</span><input type="email" value={meta.mailTo || ''} placeholder="name@firma.de" onChange={e => setMeta(m => ({ ...m, mailTo: e.target.value }))} /></label>
-              <button className="primary alt" onClick={sendMail} disabled={!!busy || !chosen.length}>{busy === 'mail' ? 'Erstelle E-Mail …' : 'Provisionen per E-Mail senden'}</button>
-            </div>
+        </div>
+        <div className="gen2">
+          <div className="gsum">Auszahlung gesamt<strong>{eur(sum)}</strong></div>
+          <div className="gact">
+            <label className="field inline"><span>Empfänger</span><input type="email" value={meta.mailTo || ''} placeholder="name@firma.de" onChange={e => setMeta(m => ({ ...m, mailTo: e.target.value }))} /></label>
+            <button className="btn-s" disabled={!chosen.length} title="Speichert die Auszahlungen dieses Monats in der Historie" onClick={() => { recordMonth(chosen); setMsg(`${chosen.length} Auszahlungen für ${meta.monat} ${meta.jahr} in der Historie gespeichert.`); }}>In Historie speichern</button>
+            <button className="primary out" onClick={sendMail} disabled={!!busy || !chosen.length} title="E-Mail-Entwurf mit ZIP im Anhang">{busy === 'mail' ? 'Erstelle E-Mail …' : 'Per E-Mail senden'}</button>
+            <button className="primary" onClick={generateAll} disabled={!!busy || !chosen.length} title="ZIP mit PDF und Excel je Mitarbeiter, Übersicht und Sicherung">{busy === 'zip' ? 'Erstelle Abrechnungen …' : `Provision generieren (${chosen.length})`}</button>
           </div>
         </div>
+        </>
       ) : data ? <p className="empty">Für {meta.monat || 'diesen Monat'} gibt es keine Mitarbeiterwerte. Wähle einen anderen Monat.</p> : null}
 
       {mailDlg && (() => { const x = list.find(l => l.e.sheet === mailDlg); if (!x) return null; return (
