@@ -1728,6 +1728,28 @@ function histFromSent(ov, employees, hist) {
   return out;
 }
 
+// Einträge zusammenführen: gleicher Name = gleiche Zeile, vorhandene Einträge bleiben unverändert
+function mergeHist(hist, src) {
+  const out = { ...hist }; let n = 0, skip = 0, last = null;
+  Object.values(src || {}).forEach(e => {
+    if (!e || monIdx(e.monat) < 0 || typeof e.total !== 'number' || !e.jahr) return;
+    const sheet = canonSheet(out, e.name, e.sheet), k = histKey(e.jahr, e.monat, sheet);
+    if (out[k]) { skip++; return; }
+    out[k] = { jahr: String(e.jahr), monat: e.monat, sheet, name: e.name || sheet, total: e.total, at: new Date().toISOString(), src: 'import' };
+    last = String(e.jahr); n++;
+  });
+  return { out, n, skip, last };
+}
+// Verschlüsselte Start-Historie (AES-GCM, Schlüssel per PBKDF2 aus dem Passwort)
+const seedB64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const seedNorm = s => String(s || '').replace(/[\s-]/g, '').toUpperCase();
+async function decryptSeed(seed, pw) {
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(seedNorm(pw)), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: seedB64(seed.salt), iterations: seed.iter, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: seedB64(seed.iv) }, key, seedB64(seed.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
 function Historie({ hist, setHist, title, profil, onBack, defJahr }) {
   const fileRef = useRef();
   const all = useMemo(() => Object.values(hist), [hist]);
@@ -1780,14 +1802,7 @@ function Historie({ hist, setHist, title, profil, onBack, defJahr }) {
       const b = JSON.parse(await file.text());
       if (b.app !== 'hetec-provisionsabrechnung-historie') throw new Error('Keine Historien-Datei.');
       if (b.profil !== profil) throw new Error(`Die Datei gehört zum Bereich „${b.profil === 'fh' ? 'Fachhandel' : 'o2 Shops'}“. Bitte oben umschalten.`);
-      const out = { ...hist }; let n = 0, skip = 0, last = null;
-      Object.values(b.hist || {}).forEach(e => {
-        if (!e || monIdx(e.monat) < 0 || typeof e.total !== 'number' || !e.jahr) return;
-        const sheet = canonSheet(out, e.name, e.sheet), k = histKey(e.jahr, e.monat, sheet);
-        if (out[k]) { skip++; return; }
-        out[k] = { jahr: String(e.jahr), monat: e.monat, sheet, name: e.name || sheet, total: e.total, at: new Date().toISOString(), src: 'import' };
-        last = String(e.jahr); n++;
-      });
+      const { out, n, skip, last } = mergeHist(hist, b.hist);
       setHist(out); if (last) setJahr(last);
       setNote(`${n} Einträge importiert${skip ? `, ${skip} schon vorhanden (nicht überschrieben)` : ''}.`);
     } catch (e) { setNote('Import fehlgeschlagen: ' + e.message); }
@@ -1988,6 +2003,32 @@ function App() {
   useEffect(() => save(pk('hist'), hist), [hist]);
   // Einmalig: bereits versendete Abrechnungen aus den Versandnachweisen übernehmen
   useEffect(() => { setHist(h => histFromSent(ov, data ? data.employees : [], h)); }, []);
+  // Verschlüsselte Start-Historie: einmal Passwort eingeben, danach liegt alles lokal im Browser
+  const [seedBox, setSeedBox] = useState(null);
+  const [seedPw, setSeedPw] = useState('');
+  useEffect(() => {
+    if (load(pk('seedDone'), false)) return;
+    fetch('historie-seed.enc.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => { if (j && j.ct) setSeedBox(j); }).catch(() => {});
+  }, []);
+  async function unlockSeed() {
+    try {
+      const plain = await decryptSeed(seedBox, seedPw);
+      let total = 0;
+      Object.keys(PROFILES).forEach(id => {
+        const src = plain[id] && plain[id].hist; if (!src) return;
+        if (id === CUR.id) { const r = mergeHist(hist, src); setHist(r.out); total += r.n; }
+        else {
+          const k = PROFILES[id].prefix + '_hist'; let cur = {};
+          try { cur = JSON.parse(localStorage.getItem(k)) || {}; } catch (e) {}
+          const r = mergeHist(cur, src); total += r.n;
+          try { localStorage.setItem(k, JSON.stringify(r.out)); } catch (e) {}
+        }
+        try { localStorage.setItem(PROFILES[id].prefix + '_seedDone', 'true'); } catch (e) {}
+      });
+      setSeedBox(null); setSeedPw('');
+      setMsg(`Historie freigeschaltet: ${total} Einträge übernommen (o2 Shops und Fachhandel). Sie liegt jetzt nur lokal in diesem Browser.`);
+    } catch (e) { setMsg('Passwort falsch oder Datei beschädigt.'); }
+  }
   const recordMonth = xs => {
     if (!xs.length || !meta.monat) return;
     const at = new Date().toISOString(), jahr = String(meta.jahr), monat = meta.monat;
@@ -2187,6 +2228,16 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
         <span>{data?.dne ? `Aktuell: ${data.dne.file} · ${data.dne.list.length} Personen` : 'Spalte A „Nachname Vorname“, Spalte D DNE % – ersetzt den Werbeversprechen-Wert'}</span>
       </div>
       {msg && <p className="msg">{msg}</p>}
+      {seedBox && (
+        <div className="card special">
+          <h2>Historie freischalten</h2>
+          <p className="empty" style={{ margin: '0 0 12px' }}>Die bisherigen Monate liegen verschlüsselt bereit. Passwort einmal eingeben, danach liegt die Historie nur lokal in diesem Browser.</p>
+          <div className="histform">
+            <label className="field"><span>Passwort</span><input type="password" autoComplete="off" value={seedPw} onChange={e => setSeedPw(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') unlockSeed(); }} /></label>
+            <button className="primary" onClick={unlockSeed} disabled={!seedPw.trim()}>Freischalten</button>
+            <button className="ghost" onClick={() => setSeedBox(null)}>Später</button>
+          </div>
+        </div>)}
 
       <div className="card">
         <div className="grid meta">

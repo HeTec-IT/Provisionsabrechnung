@@ -16,6 +16,7 @@ Button „Historie“ (oben): Tabelle aller Provisionen je Mitarbeiter und Monat
 - Bereits versendete Abrechnungen (Versandnachweise) werden einmalig übernommen.
 - Zellen anklicken = Betrag ändern oder löschen. Unten können alte Monate nachgetragen werden.
 - „Historie importieren“ lädt eine JSON-Datei mit alten Monaten (je Bereich eine Datei, vorhandene Einträge werden nicht überschrieben).
+- `historie-seed.enc.json` enthält die bisherigen Monate nur verschlüsselt (AES-256-GCM). Beim ersten Öffnen fragt die App einmal nach dem Passwort und legt die Historie lokal im Browser ab. Das Passwort steht nicht im Repository.
 - Die Historie ist Teil der Sicherung (JSON).
 
 Alle Daten bleiben lokal im Browser (localStorage). Keine Daten werden hochgeladen, die Historie liegt nicht im Repository.
