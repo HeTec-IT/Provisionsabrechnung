@@ -8,6 +8,16 @@ PWA für die monatliche Provisionsabrechnung (o2).
 4. Prüfen, Sonderprovision / Shopleiter / Gutschriften eintragen
 5. „Provision generieren“ (ZIP) oder „Provisionen per E-Mail senden“ (Outlook-Entwurf)
 
+## Unterschrift am Handy
+
+Button „Unterschrift (QR)“ je Mitarbeiter: Der Mitarbeiter scannt den QR-Code, sieht seine Abrechnung, unterschreibt mit dem Finger und schickt das signierte PDF per Teilen-Menü zurück.
+
+- Kein Server: Die Abrechnungsdaten stehen komprimiert im Link (Teil nach `#`, wird nie an einen Server gesendet). Interne Notizen sind nicht enthalten.
+- Das signierte PDF entsteht auf dem Handy (Unterschrift auf Seite 2, Datum, Uhrzeit, Prüfcode).
+- Der Prüfcode wird aus den Abrechnungsdaten berechnet und steht im Dialog und im PDF. Stimmen sie nicht überein, wurde der Link verändert.
+- „Unterschrift erhalten ✓“ markiert den Mitarbeiter in der Übersicht.
+- Es handelt sich um eine einfache elektronische Signatur.
+
 ## Historie
 
 Button „Historie“ (oben): Tabelle aller Provisionen je Mitarbeiter und Monat, mit Ø je Mitarbeiter, Ø je Monat und Gesamtdurchschnitt. Filter nach Jahr, Excel-Export.
