@@ -1937,6 +1937,29 @@ function Historie({ hist, setHist, title, profil, onBack, defJahr }) {
 // ---------- Unterschrift am Handy: Die Daten stecken im Link (#s=…), es gibt keinen Server ----------
 const b64uEnc = bytes => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 const b64uDec = s => { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const b = atob(s); const a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+// Rückkanal über das eigene (private) GitHub-Repository: Die Unterschrift wird auf dem Handy mit einem Schlüssel aus dem Link
+// (nur im #-Teil) verschlüsselt und als Datei im privaten Repo abgelegt. Das Dashboard holt sie ab, entschlüsselt sie und löscht die Datei.
+const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
+const loadRelay = () => { try { const r = JSON.parse(localStorage.getItem('provi_relay')); return r && REPO_RE.test(r.repo || '') && r.token ? r : null; } catch (e) { return null; } };
+const rnd = n => b64uEnc(crypto.getRandomValues(new Uint8Array(n)));
+const ghUrl = (repo, id) => `https://api.github.com/repos/${repo}/contents/sig/${encodeURIComponent(id)}.json`;
+const ghHead = t => ({ Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' });
+async function relayKey(k, use) { return crypto.subtle.importKey('raw', b64uDec(k), 'AES-GCM', false, [use]); }
+async function relayPut(q, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await relayKey(q.k, 'encrypt'), new TextEncoder().encode(JSON.stringify(obj))));
+  const body = JSON.stringify({ iv: b64uEnc(iv), ct: b64uEnc(ct), at: Date.now() });
+  const r = await fetch(ghUrl(q.r, q.i), { method: 'PUT', headers: ghHead(q.t), body: JSON.stringify({ message: 'Unterschrift', content: btoa(body) }) });
+  if (!r.ok) throw new Error(r.status === 422 ? 'schon übermittelt' : 'Repository nicht erreichbar (' + r.status + ')');
+}
+async function relayGet(rl, rq) {
+  const r = await fetch(ghUrl(rl.repo, rq.id), { headers: ghHead(rl.token), cache: 'no-store' });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error('Repository nicht erreichbar (' + r.status + ')');
+  const f = await r.json(); const j = JSON.parse(atob(String(f.content).replace(/\s/g, '')));
+  return { sha: f.sha, s: JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64uDec(j.iv) }, await relayKey(rq.k, 'decrypt'), b64uDec(j.ct)))) };
+}
+const relayDel = (rl, rq, sha) => fetch(ghUrl(rl.repo, rq.id), { method: 'DELETE', headers: ghHead(rl.token), body: JSON.stringify({ message: 'abgeholt', sha }) });
 async function packPayload(obj) {
   const raw = new TextEncoder().encode(JSON.stringify(obj));
   if (typeof CompressionStream !== 'undefined') {
@@ -1958,10 +1981,10 @@ async function pruefcode(p) {
   const h = [...new Uint8Array(d)].slice(0, 4).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
   return h.slice(0, 4) + '-' + h.slice(4);
 }
-function signPayload(x, R, to) {
+function signPayload(x, R, to, rq) {
   const i = {}; Object.entries(x.inp).forEach(([k, v]) => { if (['notiz', 'signImg', 'signNote', 'datum'].includes(k) || v === '' || v == null || v === false) return; i[k] = v; });
   const D = CUR.core.DEFAULT_RULES, r = {}; Object.keys(D).forEach(k => { if (R[k] !== D[k]) r[k] = R[k]; });
-  return { v: 1, p: CUR.id, i, r, ...(to ? { t: to } : {}) };
+  return { v: 1, p: CUR.id, i, r, ...(to ? { t: to } : {}), ...(rq ? { q: { i: rq.id, k: rq.k, r: rq.r, t: rq.t } } : {}) };
 }
 
 async function parseSigPdf(file) {
@@ -1974,8 +1997,10 @@ async function parseSigPdf(file) {
   return o;
 }
 
-function SignDialog({ x, meta, R, onClose, onImport, onUnmark }) {
+function SignDialog({ x, meta, R, rq, relay, onRelay, onClose, onImport, onPoll, onUnmark }) {
   const impRef = useRef();
+  const [cfg, setCfg] = useState(false);
+  const [rf, setRf] = useState({ repo: (relay && relay.repo) || '', token: '' });
   const [to, setTo] = useState(() => { try { return localStorage.getItem('provi_signTo') || ''; } catch (e) { return ''; } });
   const [lk, setLk] = useState(null);
   const [note, setNote] = useState('');
@@ -1984,7 +2009,7 @@ function SignDialog({ x, meta, R, onClose, onImport, onUnmark }) {
     let off = false;
     (async () => {
       try {
-        const p = signPayload(x, R, to.trim());
+        const p = signPayload(x, R, to.trim(), rq);
         const url = location.origin + location.pathname + '#s=' + await packPayload(p);
         const code = await pruefcode(p);
         let svg = '';
@@ -1993,7 +2018,7 @@ function SignDialog({ x, meta, R, onClose, onImport, onUnmark }) {
       } catch (e) { if (!off) setLk({ err: 'QR-Code konnte nicht erstellt werden: ' + e.message }); }
     })();
     return () => { off = true; };
-  }, [to]);
+  }, [to, rq && rq.id]);
   const saveTo = v => { setTo(v); try { localStorage.setItem('provi_signTo', v); } catch (e) {} };
   async function copy() { try { await navigator.clipboard.writeText(lk.url); setNote('Link kopiert.'); } catch (e) { setNote('Kopieren nicht möglich.'); } }
   async function share() { try { await navigator.share({ title: `Provision ${meta.monat} ${meta.jahr}`, url: lk.url }); } catch (e) {} }
@@ -2011,11 +2036,21 @@ function SignDialog({ x, meta, R, onClose, onImport, onUnmark }) {
           {x.sig && <button className="ghost" onClick={onUnmark}>Unterschrift entfernen</button>}
           <button className="ghost" onClick={copy} disabled={!lk || !lk.url}>Link kopieren</button>
           {navigator.share && <button className="ghost" onClick={share} disabled={!lk || !lk.url}>Link teilen</button>}
-          <button className="primary" onClick={() => impRef.current.click()}>Unterschriebenes PDF einlesen</button>
+          {relay && !x.sig && <button className="primary" onClick={onPoll}>Jetzt abrufen</button>}
+          <button className={relay && !x.sig ? 'ghost' : 'primary'} onClick={() => impRef.current.click()}>Unterschriebenes PDF einlesen</button>
           <input ref={impRef} type="file" accept=".pdf,application/pdf" multiple hidden onChange={e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) onImport(fs); }} />
         </div>
+        {relay && !x.sig && <p className="modal-sub">Wartet auf Unterschrift … sie wird automatisch übernommen, sobald der Mitarbeiter unterschrieben hat.</p>}
+        {(!relay || cfg) ? (
+          <div className="relaycfg">
+            <p className="modal-sub"><b>Automatischer Rückweg über dein privates GitHub-Repo</b> (einmalig): Neues <u>privates</u> Repository anlegen, dann unter GitHub → Settings → Developer settings → Fine-grained tokens ein Token erzeugen: nur dieses Repository, Berechtigung „Contents: Read and write“.</p>
+            <label className="field"><span>Repository (Besitzer/Name)</span><input value={rf.repo} placeholder="HeTec-IT/Unterschriften" onChange={e => setRf(f => ({ ...f, repo: e.target.value.trim() }))} /></label>
+            <label className="field"><span>Token</span><input type="password" autoComplete="off" value={rf.token} placeholder="github_pat_…" onChange={e => setRf(f => ({ ...f, token: e.target.value.trim() }))} /></label>
+            <button className="ghost" disabled={!REPO_RE.test(rf.repo) || !rf.token} onClick={() => { onRelay({ repo: rf.repo, token: rf.token }); setCfg(false); }}>Speichern</button>
+          </div>
+        ) : <button className="link tiny" onClick={() => setCfg(true)}>Rückweg: {relay.repo} · ändern</button>}
         {x.sig && <p className={x.sigChanged ? 'warnline' : 'msg'}>{x.sigChanged ? 'Unterschrift vom ' + new Date(x.sig.at).toLocaleDateString('de-DE') + ' gilt nicht mehr: Der Betrag hat sich geändert. Bitte neu unterschreiben lassen.' : '✓ Unterschrift vom ' + new Date(x.sig.at).toLocaleString('de-DE') + ' ist im PDF enthalten.'}</p>}
-        <small className="hint">Mitarbeiter scannt den Code, prüft die Abrechnung und unterschreibt am Handy. Das unterschriebene PDF schickt er zurück; hier einlesen, dann steht die Unterschrift im PDF-Button und in der E-Mail. Die Daten stehen nur im Link, nichts wird gespeichert.</small>
+        <small className="hint">Mitarbeiter scannt den Code, prüft die Abrechnung und unterschreibt am Handy. Die Unterschrift kommt verschlüsselt zurück und steht danach im PDF-Button und in der E-Mail. Die Abrechnungsdaten stehen nur im Link.</small>
       </div>
     </div>
   );
@@ -2065,7 +2100,7 @@ function SignApp() {
   const pdfFor = extra => buildPdf(window.jspdf.jsPDF, { ...inp, datum: heute(), ...extra }, R);
   const preview = () => { try { window.open(pdfFor({}).output('bloburl'), '_blank'); } catch (e) { setMsg('PDF-Vorschau nicht möglich: ' + e.message); } };
   const clearSig = () => { cvRef.current.getContext('2d').clearRect(0, 0, 900, 300); setHas(false); };
-  function sign() {
+  async function sign() {
     setBusy(true); setMsg('');
     try {
       const now = new Date();
@@ -2077,7 +2112,12 @@ function SignApp() {
       // Unterschrift zusätzlich als Metadaten im PDF: Das Dashboard liest sie daraus wieder ein
       const sigMeta = { v: 1, f: st.p.p, s: inp.name, m: inp.monat, j: inp.jahr, c: st.code, t: res.total, a: now.toISOString(), d: heute(), i: img, n: note };
       doc.setProperties({ keywords: 'HETECSIG:' + b64uEnc(new TextEncoder().encode(JSON.stringify(sigMeta))) });
-      setSt(s => ({ ...s, phase: 'done', blob: doc.output('blob'), name: fname(inp, 'pdf').replace(/\.pdf$/, '_unterschrieben.pdf') }));
+      const q = st.p.q, viaRelay = !!(q && q.i && q.k && q.t && REPO_RE.test(q.r || ''));
+      setSt(s => ({ ...s, phase: 'done', up: viaRelay ? 'sending' : 'none', blob: doc.output('blob'), name: fname(inp, 'pdf').replace(/\.pdf$/, '_unterschrieben.pdf') }));
+      if (viaRelay) {
+        try { await relayPut(q, sigMeta); setSt(s => ({ ...s, up: 'ok' })); }
+        catch (e) { setSt(s => ({ ...s, up: e.message === 'schon übermittelt' ? 'ok' : 'err' })); }
+      }
     } catch (e) { setMsg('Fehler beim Erstellen: ' + e.message); }
     setBusy(false);
   }
@@ -2092,9 +2132,12 @@ function SignApp() {
   if (st.phase === 'done') return (
     <div className="signwrap">
       <h1>Unterschrieben ✓</h1>
-      <p>Deine Unterschrift ist im PDF. Bitte schicke es jetzt zurück{st.p.t ? <> an <b>{st.p.t}</b></> : ' an deinen Vorgesetzten'}.</p>
-      <button className="primary full" onClick={share}>PDF senden / teilen</button>
-      <button className="ghost full" onClick={save}>PDF speichern</button>
+      {st.up === 'ok' ? <><p>Deine Unterschrift wurde übermittelt. Du musst nichts weiter tun.</p><button className="ghost full" onClick={save}>PDF-Kopie speichern</button></>
+        : st.up === 'sending' ? <p>Übermittle Unterschrift …</p>
+        : <>
+          <p>{st.up === 'err' ? 'Die Übermittlung hat nicht geklappt. ' : ''}Deine Unterschrift ist im PDF. Bitte schicke es jetzt zurück{st.p.t ? <> an <b>{st.p.t}</b></> : ' an deinen Vorgesetzten'}.</p>
+          <button className="primary full" onClick={share}>PDF senden / teilen</button>
+          <button className="ghost full" onClick={save}>PDF speichern</button></>}
       <p className="empty">Prüfcode {st.code}</p>
     </div>);
   return (
@@ -2208,6 +2251,42 @@ function App() {
   const patch = (sheet, p) => setOv(s => { const k = key(sheet); const cur = s[k] || {}; return { ...s, [k]: { ...cur, ...('include' in p ? { include: p.include } : {}), ...('sent' in p ? { sent: p.sent } : {}), ...('sig' in p ? { sig: p.sig } : {}), fields: { ...(cur.fields || {}), ...(p.fields || {}) } } }; });
   const [mailDlg, setMailDlg] = useState(null);
   const [signDlg, setSignDlg] = useState(null);
+  const [sigReq, setSigReq] = useState(() => load(pk('sigReq'), {}));
+  const [relay, setRelay] = useState(loadRelay);
+  const relayRef = useRef(relay);
+  const sigReqRef = useRef(sigReq);
+  useEffect(() => { relayRef.current = relay; }, [relay]);
+  const saveRelay = r => { try { localStorage.setItem('provi_relay', JSON.stringify(r)); } catch (e) {} relayRef.current = r; setRelay(r); };
+  useEffect(() => { sigReqRef.current = sigReq; save(pk('sigReq'), sigReq); }, [sigReq]);
+  const openSign = sheet => {
+    const k = key(sheet);
+    if (relayRef.current && !sigReqRef.current[k]) { const rq = { id: rnd(16), k: rnd(16), at: new Date().toISOString() }; sigReqRef.current = { ...sigReqRef.current, [k]: rq }; setSigReq(m => ({ ...m, [k]: rq })); }
+    setSignDlg(sheet);
+  };
+  async function pollSigs(manual) {
+    const rl = relayRef.current; if (!rl) return;
+    let n = 0;
+    for (const [k, rq] of Object.entries(sigReqRef.current)) {
+      try {
+        const got = await relayGet(rl, rq);
+        if (!got) continue;
+        const s = got.s;
+        if (s.v !== 1 || `${s.j}|${s.m}|${s.s}` !== k || typeof s.i !== 'string' || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(s.i)) continue;
+        setOv(o => ({ ...o, [k]: { ...(o[k] || {}), sig: { img: s.i, note: s.n, code: s.c, total: s.t, datum: s.d, at: s.a || new Date().toISOString() } } }));
+        sigReqRef.current = Object.fromEntries(Object.entries(sigReqRef.current).filter(([x]) => x !== k));
+        setSigReq(sigReqRef.current);
+        relayDel(rl, rq, got.sha).catch(() => {});
+        n++;
+        setMsg(`Unterschrift von ${s.s} eingegangen.`);
+      } catch (e) {}
+    }
+    if (!n && manual) setMsg('Noch keine neue Unterschrift eingegangen.');
+  }
+  useEffect(() => {
+    const f = () => { if (!document.hidden && relayRef.current && Object.keys(sigReqRef.current).length) pollSigs(); };
+    f(); const t = setInterval(f, 15000); window.addEventListener('focus', f);
+    return () => { clearInterval(t); window.removeEventListener('focus', f); };
+  }, []);
   const [mailSet, setMailSet] = useState(() => load(pk('mail'), {}));
   useEffect(() => save(pk('mail'), mailSet), [mailSet]);
 
@@ -2542,7 +2621,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
                         <button className="btn-s" onClick={() => setEdit(x.e.sheet)}>Bearbeiten</button>
                         <button className={'btn-s' + (x.inp.signImg ? ' sentbtn' : '')} onClick={() => onePdf(x.inp)} disabled={!!busy} title={x.inp.signImg ? 'PDF inklusive Unterschrift des Mitarbeiters' : ''}>{x.inp.signImg ? 'PDF ✍' : 'PDF'}</button>
                         <button className={'btn-s' + (x.sent ? ' sentbtn' : '')} onClick={() => setMailDlg(x.e.sheet)} disabled={!!busy}>{x.sent ? '✓ E-Mail' : 'E-Mail'}</button>
-                        <button className={'btn-s' + (x.sig && !x.sigChanged ? ' sentbtn' : '')} onClick={() => setSignDlg(x.e.sheet)} disabled={!!busy} title="QR-Code: Mitarbeiter unterschreibt die Abrechnung am Handy">{x.sig && !x.sigChanged ? '✓ Unterschrift' : 'Unterschrift (QR)'}</button>
+                        <button className={'btn-s' + (x.sig && !x.sigChanged ? ' sentbtn' : '')} onClick={() => openSign(x.e.sheet)} disabled={!!busy} title="QR-Code: Mitarbeiter unterschreibt die Abrechnung am Handy">{x.sig && !x.sigChanged ? '✓ Unterschrift' : 'Unterschrift (QR)'}</button>
                         {x.sent && <button className="link tiny" onClick={() => patch(x.e.sheet, { sent: null })}>Haken entfernen</button>}
                       </td>
                     </tr>
@@ -2580,9 +2659,10 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
         <MailDialog x={x} meta={meta} R={R} mailAddr={mailSet[x.e.sheet]} onClose={() => setMailDlg(null)}
           onSent={to => { setMailSet(m => ({ ...m, [x.e.sheet]: to })); patch(x.e.sheet, { sent: { at: new Date().toISOString(), to, total: x.res.total } }); recordMonth([x]); setMailDlg(null); setMsg(`E-Mail-Entwurf für ${x.inp.vollerName} erstellt – Datei öffnen, sie erscheint in Outlook.`); }} />); })()}
       {signDlg && (() => { const x = list.find(l => l.e.sheet === signDlg); if (!x) return null; return (
-        <SignDialog x={x} meta={meta} R={R} onClose={() => setSignDlg(null)}
+        <SignDialog x={x} meta={meta} R={R} rq={relay && sigReq[key(x.e.sheet)] ? { ...sigReq[key(x.e.sheet)], r: relay.repo, t: relay.token } : null} relay={relay} onRelay={saveRelay} onClose={() => setSignDlg(null)}
           onImport={async fs => { await importSigs(fs); setSignDlg(null); }}
-          onUnmark={() => { patch(x.e.sheet, { sig: null }); setSignDlg(null); }} />); })()}
+          onPoll={() => pollSigs(true)}
+          onUnmark={() => { patch(x.e.sheet, { sig: null }); const k = key(x.e.sheet); sigReqRef.current = Object.fromEntries(Object.entries(sigReqRef.current).filter(([z]) => z !== k)); setSigReq(sigReqRef.current); setSignDlg(null); }} />); })()}
       <Rules R={R} setR={setR} />
       <button className="ghost" onClick={() => setEdit('__manual')}>Einzelabrechnung ohne Import</button>
     </div>
