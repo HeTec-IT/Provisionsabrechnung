@@ -10,12 +10,14 @@ PWA für die monatliche Provisionsabrechnung (o2).
 
 ## Unterschrift am Handy
 
-Button „Unterschrift (QR)“ je Mitarbeiter: Der Mitarbeiter scannt den QR-Code, sieht seine Abrechnung, unterschreibt mit dem Finger und schickt das signierte PDF per Teilen-Menü zurück.
+Button „Unterschrift (QR)“ je Mitarbeiter: Der Mitarbeiter scannt den QR-Code, sieht seine Abrechnung, unterschreibt mit dem Finger und schickt das unterschriebene PDF per Teilen-Menü zurück.
 
 - Kein Server: Die Abrechnungsdaten stehen komprimiert im Link (Teil nach `#`, wird nie an einen Server gesendet). Interne Notizen sind nicht enthalten.
-- Das signierte PDF entsteht auf dem Handy (Unterschrift auf Seite 2, Datum, Uhrzeit, Prüfcode).
-- Der Prüfcode wird aus den Abrechnungsdaten berechnet und steht im Dialog und im PDF. Stimmen sie nicht überein, wurde der Link verändert.
-- „Unterschrift erhalten ✓“ markiert den Mitarbeiter in der Übersicht.
+- Das PDF entsteht auf dem Handy. Die Unterschrift steht im grünen Feld „Auszahlungsbetrag“ (Seite 1) und auf der Zeile „Arbeitnehmer“ (Seite 2), dazu Datum, Uhrzeit und Prüfcode.
+- Zurück im Dashboard: „Unterschriften einlesen“ (oben, mehrere PDFs möglich) oder im QR-Dialog „Unterschriebenes PDF einlesen“. Die Unterschrift steckt als Metadaten im PDF und wird dem Mitarbeiter zugeordnet.
+- Danach enthält der Button „PDF ✍“ die Unterschrift; sie ist auch im ZIP („Provision generieren“) und in der E-Mail je Mitarbeiter (Haken „Mit Unterschrift“) enthalten.
+- Ändert sich der Auszahlungsbetrag nach der Unterschrift, gilt sie nicht mehr (Hinweis in der Übersicht, PDF ohne Unterschrift).
+- Der Prüfcode wird aus den Abrechnungsdaten berechnet. Stimmen Dialog und PDF nicht überein, wurde der Link verändert.
 - Es handelt sich um eine einfache elektronische Signatur.
 
 ## Historie

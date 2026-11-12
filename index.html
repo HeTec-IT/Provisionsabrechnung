@@ -627,6 +627,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (res.fixGreift) txt(`Fixprovision greift (berechnet ${eur2(res.brutto)})`, X[6] - 1.6, gy + 8.5, { size: 5.5, align: 'right' });
     txt('Datum & Unterschrift Mitarbeiter', X[0] + 0.6, gy + gh - 0.8, { size: 6.5 });
     txt('Datum & Unterschrift Vorgesetzter', 118.5, gy + gh - 0.8, { size: 6.5 });
+    // Digitale Unterschrift Mitarbeiter (Datum links, Unterschrift daneben)
+    if (inp.signImg) { try { doc.addImage(inp.signImg, 'PNG', X[0] + 27, gy + 5.8, 26, 8.6); } catch (e) {} if (inp.datum) txt(inp.datum, X[0] + 0.6, gy + 12.6, { size: 7 }); }
 
     // Regularien
     y = gy + gh + 4.5;
@@ -1189,6 +1191,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (res.fixGreift) txt(`(berechnet ${eur(res.brutto)} – Provisionsabsicherung greift)`, X[5] - 2, y + 8, { size: 5.5, align: 'right' });
     txt('Datum & Unterschrift Mitarbeiter', X[0] + 0.6, y + gh - 0.8, { size: 5.5 });
     txt('& Unterschrift Vorgesetzter', 120, y + gh - 0.8, { size: 5.5 });
+    // Digitale Unterschrift Mitarbeiter (Datum links, Unterschrift daneben)
+    if (inp.signImg) { try { doc.addImage(inp.signImg, 'PNG', X[0] + 25, y + 5.6, 19, 6.3); } catch (e) {} if (inp.datum) txt(inp.datum, X[0] + 0.6, y + 10.8, { size: 6.5 }); }
     y += gh;
     txt('Sicherungsprovision', X[0] + 0.6, y + 2.5, { size: 5.5 });
     txt(de(R.fix) + ' €', X[4] + 3, y + 2.6, { bold: true, italic: true, size: 6.5 });
@@ -1437,15 +1441,19 @@ function MailDialog({ x, meta, R, mailAddr, onClose, onSent }) {
   const [subject, setSubject] = useState(`Provisionsabrechnung ${meta.monat} ${meta.jahr} – ${x.inp.vollerName || x.e.sheet}`);
   const [body, setBody] = useState(`Hallo ${vn},\n\nanbei deine Provisionsabrechnung für ${meta.monat} ${meta.jahr}.\n\nAuszahlungsbetrag: ${eur(x.res.total)}\n\nBitte prüfe die Abrechnung und melde dich bei Fragen gerne bei mir.\n\nViele Grüße`);
   const [mitExcel, setMitExcel] = useState(false);
+  const hasSig = !!x.inp.signImg;
+  const [mitSig, setMitSig] = useState(hasSig);
+  const pdfName = hasSig && mitSig ? fname(x.inp, 'pdf').replace(/\.pdf$/, '_unterschrieben.pdf') : fname(x.inp, 'pdf');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const ok = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to.trim());
+  const ok =/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to.trim());
   const vorschlag = mailVorschlag(x.inp.vollerName);
   useEffect(() => { const k = e => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, []);
   async function go() {
     setBusy(true); setErr('');
     try {
-      const files = [{ name: fname(x.inp, 'pdf'), mime: 'application/pdf', bytes: new Uint8Array(buildPdf(window.jspdf.jsPDF, x.inp, R).output('arraybuffer')) }];
+      const pinp = hasSig && !mitSig ? { ...x.inp, signImg: undefined, signNote: undefined, datum: meta.datum } : x.inp;
+      const files = [{ name: pdfName, mime: 'application/pdf', bytes: new Uint8Array(buildPdf(window.jspdf.jsPDF, pinp, R).output('arraybuffer')) }];
       if (mitExcel) { const { buffer } = await buildXlsx(ExcelJS, null, x.inp, R); files.push({ name: fname(x.inp, 'xlsx'), mime: XLSX_MIME, bytes: new Uint8Array(buffer) }); }
       const html = `<html><body style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#000">${body.split(/\n{2,}/).map(p => `<p>${escH(p).replace(/\n/g, '<br>')}</p>`).join('')}<\/body><\/html>`;
       const eml = makeEml({ to: to.trim(), subject, text: body, html, files });
@@ -1465,7 +1473,8 @@ function MailDialog({ x, meta, R, mailAddr, onClose, onSent }) {
         <label className="field"><span>Betreff</span><input type="text" value={subject} onChange={e => setSubject(e.target.value)} /></label>
         <label className="field"><span>Nachricht</span><textarea className="notes" rows={8} value={body} onChange={e => setBody(e.target.value)} /></label>
         <div className="attach">
-          <span className="file">📎 {fname(x.inp, 'pdf')}</span>
+          <span className="file">📎 {pdfName}</span>
+          {hasSig && <label className="check"><input type="checkbox" checked={mitSig} onChange={e => setMitSig(e.target.checked)} /> Mit Unterschrift des Mitarbeiters</label>}
           <label className="check"><input type="checkbox" checked={mitExcel} onChange={e => setMitExcel(e.target.checked)} /> Excel zusätzlich anhängen</label>
         </div>
         {err && <p className="err">{err}</p>}
@@ -1950,12 +1959,23 @@ async function pruefcode(p) {
   return h.slice(0, 4) + '-' + h.slice(4);
 }
 function signPayload(x, R, to) {
-  const i = {}; Object.entries(x.inp).forEach(([k, v]) => { if (k === 'notiz' || v === '' || v == null || v === false) return; i[k] = v; });
+  const i = {}; Object.entries(x.inp).forEach(([k, v]) => { if (['notiz', 'signImg', 'signNote', 'datum'].includes(k) || v === '' || v == null || v === false) return; i[k] = v; });
   const D = CUR.core.DEFAULT_RULES, r = {}; Object.keys(D).forEach(k => { if (R[k] !== D[k]) r[k] = R[k]; });
   return { v: 1, p: CUR.id, i, r, ...(to ? { t: to } : {}) };
 }
 
-function SignDialog({ x, meta, R, onClose, onMark, onUnmark }) {
+async function parseSigPdf(file) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  let s = ''; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  const m = /HETECSIG:([A-Za-z0-9_-]+)/.exec(s);
+  if (!m) throw new Error('keine Unterschrift im PDF gefunden');
+  const o = JSON.parse(new TextDecoder().decode(b64uDec(m[1])));
+  if (!o || o.v !== 1 || !o.s || !o.m || !o.j || typeof o.i !== 'string' || !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(o.i)) throw new Error('Unterschrift im PDF ist ungültig');
+  return o;
+}
+
+function SignDialog({ x, meta, R, onClose, onImport, onUnmark }) {
+  const impRef = useRef();
   const [to, setTo] = useState(() => { try { return localStorage.getItem('provi_signTo') || ''; } catch (e) { return ''; } });
   const [lk, setLk] = useState(null);
   const [note, setNote] = useState('');
@@ -1988,12 +2008,14 @@ function SignDialog({ x, meta, R, onClose, onMark, onUnmark }) {
         <label className="field"><span>Rückmeldung an (E-Mail, wird dem Mitarbeiter angezeigt)</span><input type="email" value={to} placeholder={`name@${MAIL_DOMAIN}`} onChange={e => saveTo(e.target.value)} /></label>
         {note && <p className="msg">{note}</p>}
         <div className="modal-act">
-          {x.signed && <button className="ghost" onClick={onUnmark}>Markierung entfernen</button>}
+          {x.sig && <button className="ghost" onClick={onUnmark}>Unterschrift entfernen</button>}
           <button className="ghost" onClick={copy} disabled={!lk || !lk.url}>Link kopieren</button>
           {navigator.share && <button className="ghost" onClick={share} disabled={!lk || !lk.url}>Link teilen</button>}
-          <button className="primary" onClick={onMark}>Unterschrift erhalten ✓</button>
+          <button className="primary" onClick={() => impRef.current.click()}>Unterschriebenes PDF einlesen</button>
+          <input ref={impRef} type="file" accept=".pdf,application/pdf" multiple hidden onChange={e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) onImport(fs); }} />
         </div>
-        <small className="hint">Mitarbeiter scannt den Code, prüft die Abrechnung und unterschreibt am Handy. Das PDF schickt er danach zurück. Die Daten stehen nur im Link, nichts wird gespeichert.</small>
+        {x.sig && <p className={x.sigChanged ? 'warnline' : 'msg'}>{x.sigChanged ? 'Unterschrift vom ' + new Date(x.sig.at).toLocaleDateString('de-DE') + ' gilt nicht mehr: Der Betrag hat sich geändert. Bitte neu unterschreiben lassen.' : '✓ Unterschrift vom ' + new Date(x.sig.at).toLocaleString('de-DE') + ' ist im PDF enthalten.'}</p>}
+        <small className="hint">Mitarbeiter scannt den Code, prüft die Abrechnung und unterschreibt am Handy. Das unterschriebene PDF schickt er zurück; hier einlesen, dann steht die Unterschrift im PDF-Button und in der E-Mail. Die Daten stehen nur im Link, nichts wird gespeichert.</small>
       </div>
     </div>
   );
@@ -2048,7 +2070,13 @@ function SignApp() {
     try {
       const now = new Date();
       const note = `Digital unterschrieben am ${now.toLocaleDateString('de-DE')} um ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr · Prüfcode ${st.code}`;
-      const doc = pdfFor({ signImg: cvRef.current.toDataURL('image/png'), signNote: note });
+      const sc = document.createElement('canvas'); sc.width = 450; sc.height = 150;
+      sc.getContext('2d').drawImage(cvRef.current, 0, 0, 450, 150);
+      const img = sc.toDataURL('image/png');
+      const doc = pdfFor({ signImg: img, signNote: note });
+      // Unterschrift zusätzlich als Metadaten im PDF: Das Dashboard liest sie daraus wieder ein
+      const sigMeta = { v: 1, f: st.p.p, s: inp.name, m: inp.monat, j: inp.jahr, c: st.code, t: res.total, a: now.toISOString(), d: heute(), i: img, n: note };
+      doc.setProperties({ keywords: 'HETECSIG:' + b64uEnc(new TextEncoder().encode(JSON.stringify(sigMeta))) });
       setSt(s => ({ ...s, phase: 'done', blob: doc.output('blob'), name: fname(inp, 'pdf').replace(/\.pdf$/, '_unterschrieben.pdf') }));
     } catch (e) { setMsg('Fehler beim Erstellen: ' + e.message); }
     setBusy(false);
@@ -2100,7 +2128,7 @@ function App() {
   const fileRef = useRef();
   const telRef = useRef();
   const dneRef = useRef();
-  const bakRef = useRef();
+  const bakRef = useRef(), sigRef = useRef();
   useEffect(() => save(pk('rules'), R), [R]);
   useEffect(() => save(pk('data'), data), [data]);
   useEffect(() => save(pk('meta'), meta), [meta]);
@@ -2151,10 +2179,13 @@ function App() {
       if (inp.shopleiter && !(Number(inp.slZiel) > 0)) todo.push({ t: 'Shopleiter: Margenziel fehlt' });
       if (inp.shopleiter && inp.slIst === '') todo.push({ t: 'Shopleiter: Marge-Ist fehlt' });
       const res0 = calc(inp, R);
+      // Digitale Unterschrift nur ins PDF, solange sich der Auszahlungsbetrag seit der Unterschrift nicht geändert hat
+      const sigChanged = !!(o.sig && Math.abs((o.sig.total ?? res0.total) - res0.total) > 0.004);
+      if (o.sig && !sigChanged) { inp.signImg = o.sig.img; inp.signNote = o.sig.note; if (o.sig.datum) inp.datum = o.sig.datum; }
       const credited = id => { const qx = res0.qual.find(q => q.row === id); const k = res0.korr.find(c => c.key === id); return !!(qx && k && qx.betrag < 0 && k.betrag >= -qx.betrag); };
       const todoF = todo.filter(t => !(t.k && credited(t.k))).map(t => t.t);
       const sent = o.sent || null;
-      return { e, row, inp, include, todo: todoF, tel, credited, sent, signed: o.signed || null, sentChanged: !!(sent && Math.abs((sent.total || 0) - res0.total) > 0.004), edited: !!(o.fields && Object.keys(o.fields).some(k => !['sonderBetrag', 'sonderText', 'slZiel', 'slIst', 'notiz'].includes(k))), res: res0 };
+      return { e, row, inp, include, todo: todoF, tel, credited, sent, sig: o.sig || null, sigChanged, sentChanged: !!(sent && Math.abs((sent.total || 0) - res0.total) > 0.004), edited: !!(o.fields && Object.keys(o.fields).some(k => !['sonderBetrag', 'sonderText', 'slZiel', 'slIst', 'notiz'].includes(k))), res: res0 };
     });
   }, [data, meta, ov, R, slSet, tzSet, esSet]);
   const chosen = list.filter(x => x.include);
@@ -2174,7 +2205,7 @@ function App() {
     if (Object.keys(rest).length) patch(sheet, { fields: rest });
   };
   const setEsAll = v => setEsSet(x => { const n = { ...x }; list.forEach(l => { n[key(l.e.sheet)] = v; }); return n; });
-  const patch = (sheet, p) => setOv(s => { const k = key(sheet); const cur = s[k] || {}; return { ...s, [k]: { ...cur, ...('include' in p ? { include: p.include } : {}), ...('sent' in p ? { sent: p.sent } : {}), ...('signed' in p ? { signed: p.signed } : {}), fields: { ...(cur.fields || {}), ...(p.fields || {}) } } }; });
+  const patch = (sheet, p) => setOv(s => { const k = key(sheet); const cur = s[k] || {}; return { ...s, [k]: { ...cur, ...('include' in p ? { include: p.include } : {}), ...('sent' in p ? { sent: p.sent } : {}), ...('sig' in p ? { sig: p.sig } : {}), fields: { ...(cur.fields || {}), ...(p.fields || {}) } } }; });
   const [mailDlg, setMailDlg] = useState(null);
   const [signDlg, setSignDlg] = useState(null);
   const [mailSet, setMailSet] = useState(() => load(pk('mail'), {}));
@@ -2306,6 +2337,19 @@ function App() {
       setMsg(`Sicherung „${file.name}“ geladen.`);
     } catch (e) { setMsg('Sicherung konnte nicht geladen werden: ' + e.message); }
   }
+  async function importSigs(files) {
+    let n = 0; const bad = [];
+    for (const f of files) {
+      try {
+        const s = await parseSigPdf(f);
+        if (s.f && s.f !== CUR.id) { bad.push(`${f.name}: gehört zu „${s.f === 'fh' ? 'Fachhandel' : 'o2 Shops'}“, bitte oben umschalten`); continue; }
+        const k = `${s.j}|${s.m}|${s.s}`;
+        setOv(o => ({ ...o, [k]: { ...(o[k] || {}), sig: { img: s.i, note: s.n, code: s.c, total: s.t, datum: s.d, at: s.a || new Date().toISOString() } } }));
+        n++;
+      } catch (e) { bad.push(`${f.name}: ${e.message}`); }
+    }
+    setMsg((n ? `${n} Unterschrift${n === 1 ? '' : 'en'} eingelesen. Der PDF-Button enthält sie jetzt.` : '') + (bad.length ? (n ? ' ' : '') + 'Nicht übernommen: ' + bad.join('; ') + '.' : ''));
+  }
   const zipName = () => `Provisionen_${safe(meta.monat)}_${meta.jahr}.zip`;
 
   async function generateAll() {
@@ -2378,6 +2422,8 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
         <span>Sicherung: alle Werte, Kulanzen, Begründungen und Notizen</span>
         <button className="btn-s" onClick={refreshMonth} title="Stellt den aktuellen Kalendermonat ein, ohne frühere Abrechnungen oder Versandnachweise zu löschen">↻ Monat aktualisieren</button>
         <button className="btn-s" onClick={() => setShowHist(true)} title="Alle Provisionen je Mitarbeiter und Monat mit Durchschnitten">Historie</button>
+        <button className="btn-s" onClick={() => sigRef.current.click()} title="Unterschriebene PDFs vom Handy einlesen (mehrere möglich)">Unterschriften einlesen</button>
+        <input ref={sigRef} type="file" accept=".pdf,application/pdf" multiple hidden onChange={e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) importSigs(fs); }} />
         <button className="btn-s" onClick={saveBackup} disabled={!data}>Sicherung speichern</button>
         <button className="btn-s" onClick={() => bakRef.current.click()}>Sicherung laden</button>
         <input ref={bakRef} type="file" accept=".json,application/json" hidden onChange={e => { const f = e.target.files[0]; if (f) loadBackup(f); e.target.value = ''; }} />
@@ -2468,7 +2514,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
                           {CUR.features.einstieg && <label className="tgl" title="Haken = Einstiegsschwelle gilt. Ohne Haken: Postpaid und DSL ab dem 1. Vertrag"><input type="checkbox" checked={!i.einstiegsfrei} onChange={ev => patchSl(x.e.sheet, { einstiegsfrei: !ev.target.checked })} />Einstiegsschwelle</label>}
                           <label className="tgl"><input type="checkbox" checked={!!i.shopleiter} onChange={ev => patchSl(x.e.sheet, { shopleiter: ev.target.checked })} />Shopleiter</label>
                           {x.sent && <small className={'tag ' + (x.sentChanged ? 'sentwarn' : 'sent')} title={`An ${x.sent.to} am ${new Date(x.sent.at).toLocaleString('de-DE')} · ${eur(x.sent.total)}`}>{x.sentChanged ? `✓ versendet ${kurzDatum(x.sent.at)} – Betrag geändert` : `✓ versendet ${kurzDatum(x.sent.at)}`}</small>}
-                          {x.signed && <small className="tag sent" title={`Unterschrift erhalten am ${new Date(x.signed).toLocaleString('de-DE')}`}>✓ unterschrieben {kurzDatum(x.signed)}</small>}
+                          {x.sig && <small className={'tag ' + (x.sigChanged ? 'sentwarn' : 'sent')} title={`Unterschrift vom ${new Date(x.sig.at).toLocaleString('de-DE')} · ${eur(x.sig.total)}`}>{x.sigChanged ? `✓ unterschrieben ${kurzDatum(x.sig.at)} – Betrag geändert` : `✓ unterschrieben ${kurzDatum(x.sig.at)}`}</small>}
                           {x.edited && <small className="tag">bearbeitet</small>}
                           {x.inp.notiz && <small className="tag note" title={x.inp.notiz}>Notiz</small>}
                           {!x.row.active && <small className="tag">keine Werte</small>}
@@ -2494,9 +2540,9 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
                       <td className="r pay"><strong>{eur(x.res.total)}</strong><small>Provision {eur(Math.max(x.res.brutto, R.fix))}{x.res.sl ? ' · SL ' + eur(x.res.sl.betrag) : ''}</small></td>
                       <td className="acts">
                         <button className="btn-s" onClick={() => setEdit(x.e.sheet)}>Bearbeiten</button>
-                        <button className="btn-s" onClick={() => onePdf(x.inp)} disabled={!!busy}>PDF</button>
+                        <button className={'btn-s' + (x.inp.signImg ? ' sentbtn' : '')} onClick={() => onePdf(x.inp)} disabled={!!busy} title={x.inp.signImg ? 'PDF inklusive Unterschrift des Mitarbeiters' : ''}>{x.inp.signImg ? 'PDF ✍' : 'PDF'}</button>
                         <button className={'btn-s' + (x.sent ? ' sentbtn' : '')} onClick={() => setMailDlg(x.e.sheet)} disabled={!!busy}>{x.sent ? '✓ E-Mail' : 'E-Mail'}</button>
-                        <button className={'btn-s' + (x.signed ? ' sentbtn' : '')} onClick={() => setSignDlg(x.e.sheet)} disabled={!!busy} title="QR-Code: Mitarbeiter unterschreibt die Abrechnung am Handy">{x.signed ? '✓ Unterschrift' : 'Unterschrift (QR)'}</button>
+                        <button className={'btn-s' + (x.sig && !x.sigChanged ? ' sentbtn' : '')} onClick={() => setSignDlg(x.e.sheet)} disabled={!!busy} title="QR-Code: Mitarbeiter unterschreibt die Abrechnung am Handy">{x.sig && !x.sigChanged ? '✓ Unterschrift' : 'Unterschrift (QR)'}</button>
                         {x.sent && <button className="link tiny" onClick={() => patch(x.e.sheet, { sent: null })}>Haken entfernen</button>}
                       </td>
                     </tr>
@@ -2535,8 +2581,8 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
           onSent={to => { setMailSet(m => ({ ...m, [x.e.sheet]: to })); patch(x.e.sheet, { sent: { at: new Date().toISOString(), to, total: x.res.total } }); recordMonth([x]); setMailDlg(null); setMsg(`E-Mail-Entwurf für ${x.inp.vollerName} erstellt – Datei öffnen, sie erscheint in Outlook.`); }} />); })()}
       {signDlg && (() => { const x = list.find(l => l.e.sheet === signDlg); if (!x) return null; return (
         <SignDialog x={x} meta={meta} R={R} onClose={() => setSignDlg(null)}
-          onMark={() => { patch(x.e.sheet, { signed: new Date().toISOString() }); setSignDlg(null); setMsg(`${x.inp.vollerName || x.e.sheet}: Unterschrift als erhalten markiert.`); }}
-          onUnmark={() => { patch(x.e.sheet, { signed: null }); setSignDlg(null); }} />); })()}
+          onImport={async fs => { await importSigs(fs); setSignDlg(null); }}
+          onUnmark={() => { patch(x.e.sheet, { sig: null }); setSignDlg(null); }} />); })()}
       <Rules R={R} setR={setR} />
       <button className="ghost" onClick={() => setEdit('__manual')}>Einzelabrechnung ohne Import</button>
     </div>
