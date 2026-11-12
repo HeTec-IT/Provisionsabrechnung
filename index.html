@@ -634,7 +634,6 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
 
     // Seite 2: Zusatzvereinbarung
     addZusatz(doc, inp, res);
-    if (res.sonder.betrag) addSonder(doc, inp, res);
     return doc;
   }
 
@@ -1195,7 +1194,6 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     box('Spielregeln Provisionsvereinbarung', '', reg.spielregeln(name), (l, ly) => { if (l) txt(l, X[0] + 0.8, ly, { size: FS - 0.3 }); });
 
     addZusatz(doc, inp, res);
-    if (res.sonder.betrag) addSonder(doc, inp, res);
     return doc;
   }
 
