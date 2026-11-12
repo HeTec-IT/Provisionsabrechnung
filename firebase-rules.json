@@ -1,0 +1,13 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "sig": {
+      "$id": {
+        ".read": true,
+        ".write": "!data.exists() || !newData.exists()",
+        ".validate": "!newData.exists() || (newData.hasChildren(['iv','ct']) && newData.child('ct').isString() && newData.child('ct').val().length < 100000)"
+      }
+    }
+  }
+}

@@ -14,7 +14,8 @@ Button „Unterschrift (QR)“ je Mitarbeiter: Der Mitarbeiter scannt den QR-Cod
 
 - Kein Server: Die Abrechnungsdaten stehen komprimiert im Link (Teil nach `#`, wird nie an einen Server gesendet). Interne Notizen sind nicht enthalten.
 - Das PDF entsteht auf dem Handy. Die Unterschrift steht im grünen Feld „Auszahlungsbetrag“ (Seite 1) und auf der Zeile „Arbeitnehmer“ (Seite 2), dazu Datum, Uhrzeit und Prüfcode.
-- Zurück im Dashboard: „Unterschriften einlesen“ (oben, mehrere PDFs möglich) oder im QR-Dialog „Unterschriebenes PDF einlesen“. Die Unterschrift steckt als Metadaten im PDF und wird dem Mitarbeiter zugeordnet.
+- Automatischer Rückkanal (optional): In `index.html` steht oben bei `RELAY_URL` die Adresse einer Firebase Realtime Database (Regeln siehe `firebase-rules.json`). Das Handy verschlüsselt die Unterschrift (AES-256-GCM, Schlüssel nur im Link nach `#`) und legt sie dort ab, das Dashboard holt sie alle 15 Sekunden ab, entschlüsselt sie und löscht den Eintrag. Die Datenbank sieht nur verschlüsselte Daten. Ohne `RELAY_URL` gilt der manuelle Weg.
+- Manueller Weg, zurück im Dashboard: „Unterschriften einlesen“ (oben, mehrere PDFs möglich) oder im QR-Dialog „Unterschriebenes PDF einlesen“. Die Unterschrift steckt als Metadaten im PDF und wird dem Mitarbeiter zugeordnet.
 - Danach enthält der Button „PDF ✍“ die Unterschrift; sie ist auch im ZIP („Provision generieren“) und in der E-Mail je Mitarbeiter (Haken „Mit Unterschrift“) enthalten.
 - Ändert sich der Auszahlungsbetrag nach der Unterschrift, gilt sie nicht mehr (Hinweis in der Übersicht, PDF ohne Unterschrift).
 - Der Prüfcode wird aus den Abrechnungsdaten berechnet. Stimmen Dialog und PDF nicht überein, wurde der Link verändert.
