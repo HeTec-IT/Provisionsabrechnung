@@ -207,7 +207,8 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     fhBetrag: 20,
     abwBetrag: 10,
     abzug: 0.25,
-    werbSoll: 0.85, pencilSoll: 0.75, marketingSoll: 200,
+    werbSoll: 0.85, pencilSoll: 0.75,
+    telTage1: 6, telSoll1: 250, telTage2: 12, telSoll2: 150, telTage3: 18, telSoll3: 100, telSoll4: 50,
     tvSoll: 6, osSoll: 11, tvSollTZ: 3, osSollTZ: 11,
     msySoll: 0.85, msyBonus: 100,
     fix: 250
@@ -227,6 +228,8 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
   // Alle 5 Qualitätsziele des Shops erreicht → keine Einstiegsschwelle für Postpaid und DSL (ab dem ersten Vertrag)
   const effR = (inp, R) => inp && inp.einstiegsfrei ? { ...R, ppSchwelle: 0, dslSchwelle: 0 } : R;
   const gr = s => s > 0 ? `größer ${s} Stück` : 'ab dem ersten Stück';
+  // Telefonie-Soll je Monat, gestaffelt nach Abwesenheitstagen (Urlaub + Krank): bis 6 Tage 250, bis 12 Tage 150, bis 18 Tage 100, länger 50
+  const telSollFor = (R, tage) => tage <= R.telTage1 ? R.telSoll1 : tage <= R.telTage2 ? R.telSoll2 : tage <= R.telTage3 ? R.telSoll3 : R.telSoll4;
 
   function regularien(R0, inp) {
     const R = effR(inp, R0);
@@ -282,7 +285,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     const qual = [
       { row: 'werb', label: 'Werbeversprechen', soll: R.werbSoll, ist: pct(inp.werb), rated: has(inp.werb), fmt: 'pct' },
       { row: 'pencil', label: 'Pencil-Selling', soll: R.pencilSoll, ist: pct(inp.pencil), rated: has(inp.pencil), fmt: 'pct' },
-      { row: 'marketing', label: 'Marketing Aktivitäten', soll: R.marketingSoll, ist: n(inp.marketing), rated: has(inp.marketing), fmt: 'num' },
+      { row: 'marketing', label: 'Marketing Aktivitäten', soll: telSollFor(R, urlaub + krank), abwTage: urlaub + krank, ist: n(inp.marketing), rated: has(inp.marketing), fmt: 'num' },
       { row: 'tv', label: `o2 TV unter ${nf(tvSollAnteilig)} Stück im Monat${tz ? ' (Azubi/Teilzeit)' : ''}`, soll: tvSollAnteilig, ist: tv, rated: true, fmt: 'num' },
       { row: 'os', label: `Online-Schutz unter ${nf(osSollAnteilig)} Stück im Monat${tz ? ' (Azubi/Teilzeit)' : ''}`, soll: osSollAnteilig, ist: schutzOnline, rated: true, fmt: 'num' }
     ].map(x => { const f = x.ist < x.soll ? -R.abzug : 0; return { ...x, faktor: f, betrag: r2(summe * f) }; });
@@ -897,7 +900,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     zubSockel: 50, zubAnteil: 0.5,
     instBetrag: 10, instVorBetrag: 10, pushEinzel: 10,
     abwBetrag: 10,
-    telSoll: 200, telAbzug: 0.25, pencilSoll: 0.75, pencilAbzug: 0.25, werbSoll: 0.85, werbAbzug: 0.10,
+    telTage1: 6, telSoll1: 250, telTage2: 12, telSoll2: 150, telTage3: 18, telSoll3: 100, telSoll4: 50, telAbzug: 0.25, pencilSoll: 0.75, pencilAbzug: 0.25, werbSoll: 0.85, werbAbzug: 0.10,
     intSoll: 10, intAbzug: 0, tvqSoll: 0.80, tvqAbzug: 0, ergSoll: 10000, ergAbzug: 0,
     fix: 250,
     zielMarge: 5000, zielNeu: 10, zielNeuC: 5, zielVvl: 20, zielVvlC: 5, zielDp: 5, zielTp: 2, zielFnVvl: 5, zielKs: 5, zielZub: 200, zielInst: 0, zielInstVor: 0
@@ -912,13 +915,15 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
   const eur = v => v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
   const strip = s => String(s).replace(/\*\*/g, '');
   const has = v => !(v === '' || v == null);
+  // Telefonie-Soll je Monat, gestaffelt nach Abwesenheitstagen (Urlaub + Krank)
+  const telSollFor = (R, tage) => tage <= R.telTage1 ? R.telSoll1 : tage <= R.telTage2 ? R.telSoll2 : tage <= R.telTage3 ? R.telSoll3 : R.telSoll4;
 
   function regularien(R) {
     const p0 = v => Math.round(v * 1000) / 10 + '%';
     const ab = r => r > 0 ? `= ${p0(r)} Provisionsabzug für den Mitarbeiter` : '= aktuell kein Provisionsabzug';
     return {
       malus: [
-        ['VVL Prozess:', ` Unter ${R.telSoll} VVL Prozess Aktionen: Festnetz Abfrage + Festnetz Telefonie + Mobilfunk Telefonie ${ab(R.telAbzug)}`],
+        ['VVL Prozess:', ` Unter ${R.telSoll1} VVL Prozess Aktionen: Festnetz Abfrage + Festnetz Telefonie + Mobilfunk Telefonie ${ab(R.telAbzug)}`],
         ['', ''],
         ['', 'Ziel: Shop hat VVL Prozess Festnetz & Mobilfunk zu 100% bearbeitet'],
         ['', '1x Festnetzabfrage & 1x Festnetztelefonie  bei einem Datensatz = 2 Zähler'],
@@ -976,7 +981,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
     const summe = r2(rows.reduce((s, r) => s + r.aus, 0));
     const ergIst = has(inp.shopMarge) ? g('shopMarge') : marge;
     const qual = [
-      { row: 'tel', label: 'VVL Telefonie + Abfrage', soll: R.telSoll, ist: g('tel'), rated: has(inp.tel), fmt: 'num', rate: R.telAbzug },
+      { row: 'tel', label: 'VVL Telefonie + Abfrage', soll: telSollFor(R, g('urlaub') + g('krank')), abwTage: g('urlaub') + g('krank'), ist: g('tel'), rated: has(inp.tel), fmt: 'num', rate: R.telAbzug },
       { row: 'pencil', label: 'Pencil Selling', soll: R.pencilSoll, ist: pct(inp.pencil), rated: has(inp.pencil), fmt: 'pct', rate: R.pencilAbzug, color: true },
       { row: 'werb', label: 'Werbeversprechen', soll: R.werbSoll, ist: pct(inp.werb), rated: has(inp.werb), fmt: 'pct', rate: R.werbAbzug, color: true },
       { row: 'int', label: 'Intressentenerfassung', soll: R.intSoll, ist: g('interessenten'), rated: has(inp.interessenten), fmt: 'num', rate: R.intAbzug },
@@ -1476,7 +1481,8 @@ const O2_RULE_GROUPS = [
   ['DSL', [['dslSchwelle', 'provisioniert ab Stück über', 1], ['dslSoll', 'DSL-Quote Soll %', 100], ['dslBetragNiedrig', '€ bei Quote bis Soll', 1], ['dslBetragHoch', '€ bei Quote über Soll', 1], ['dslVvlBetrag', 'DSL VVL € je Stück', 1]]],
   ['VVL & Zubehör', [['vvlSchwelle', 'VVL provisioniert ab Stück über', 1], ['vvlBetrag', 'VVL € je Stück', 1], ['zubSchwelle', 'Zubehör-Marge Freibetrag €', 1], ['zubAnteil', 'Zubehör-Anteil %', 100], ['fhBetrag', 'Fachhandel € je Aktivierung', 1]]],
   ['Urlaub/Krankheit', [['abwBetrag', '€ je Tag', 1]]],
-  ['Qualitätsziele', [['abzug', 'Abzug je verfehltem Ziel %', 100], ['werbSoll', 'Werbeversprechen Soll %', 100], ['pencilSoll', 'Pencil Selling Soll %', 100], ['marketingSoll', 'Marketing/Telefonie Soll', 1], ['tvSoll', 'o2 TV Soll (Vollzeit)', 1], ['osSoll', 'Online-Schutz Soll (Vollzeit)', 1], ['tvSollTZ', 'o2 TV Soll (Azubi/Teilzeit)', 1], ['osSollTZ', 'Online-Schutz Soll (Azubi/Teilzeit)', 1]]],
+  ['Qualitätsziele', [['abzug', 'Abzug je verfehltem Ziel %', 100], ['werbSoll', 'Werbeversprechen Soll %', 100], ['pencilSoll', 'Pencil Selling Soll %', 100], ['tvSoll', 'o2 TV Soll (Vollzeit)', 1], ['osSoll', 'Online-Schutz Soll (Vollzeit)', 1], ['tvSollTZ', 'o2 TV Soll (Azubi/Teilzeit)', 1], ['osSollTZ', 'Online-Schutz Soll (Azubi/Teilzeit)', 1]]],
+  ['Telefonie-Soll nach Abwesenheit (Urlaub + Krank)', [['telTage1', 'Stufe 1: bis Tage', 1], ['telSoll1', 'Stufe 1: Telefonate', 1], ['telTage2', 'Stufe 2: bis Tage', 1], ['telSoll2', 'Stufe 2: Telefonate', 1], ['telTage3', 'Stufe 3: bis Tage', 1], ['telSoll3', 'Stufe 3: Telefonate', 1], ['telSoll4', 'länger: Telefonate', 1]]],
   ['Boni & Fix', [['msySoll', 'MSY Soll %', 100], ['msyBonus', 'MSY Bonus €', 1], ['fix', 'Fixprovision €', 1]]]
 ];
 
@@ -1522,7 +1528,8 @@ const PROFILES = {
       ['Festnetz', [['dpSockel', 'DP Sockel', 1], ['dpBetrag', 'DP €', 1], ['dpMitTp', 'DP-Zeile inkl. TP (1 = ja, 0 = nein)', 1], ['tpSockel', 'TP Sockel', 1], ['tpBetrag', 'TP €', 1], ['fnVvlSockel', 'FN VVL Sockel', 1], ['fnVvlBetrag', 'FN VVL €', 1]]],
       ['Komplettschutz, Zubehör, Service', [['ksSockel', 'KS Sockel', 1], ['ksBetrag', 'KS €', 1], ['zubSockel', 'Zubehör Sockel €', 1], ['zubAnteil', 'Zubehör Anteil %', 100], ['instBetrag', 'Installationsservice €', 1], ['instVorBetrag', 'Installation vor Ort €', 1], ['pushEinzel', 'Sonderpush € je Stück', 1]]],
       ['Urlaub/Krankheit', [['abwBetrag', '€ je Tag', 1]]],
-      ['Qualitätssicherung (Soll / Abzug)', [['telSoll', 'Telefonie Soll', 1], ['telAbzug', 'Telefonie Abzug %', 100], ['pencilSoll', 'Pencil Soll %', 100], ['pencilAbzug', 'Pencil Abzug %', 100], ['werbSoll', 'Werbeversprechen Soll %', 100], ['werbAbzug', 'Werbeversprechen Abzug %', 100], ['intSoll', 'Interessenten Soll', 1], ['intAbzug', 'Interessenten Abzug %', 100], ['tvqSoll', 'TV-Quote Soll %', 100], ['tvqAbzug', 'TV-Quote Abzug %', 100], ['ergSoll', 'Ergebnissicherung Soll €', 1], ['ergAbzug', 'Ergebnissicherung Abzug %', 100]]],
+      ['Telefonie-Soll nach Abwesenheit (Urlaub + Krank)', [['telTage1', 'Stufe 1: bis Tage', 1], ['telSoll1', 'Stufe 1: Telefonate', 1], ['telTage2', 'Stufe 2: bis Tage', 1], ['telSoll2', 'Stufe 2: Telefonate', 1], ['telTage3', 'Stufe 3: bis Tage', 1], ['telSoll3', 'Stufe 3: Telefonate', 1], ['telSoll4', 'länger: Telefonate', 1]]],
+      ['Qualitätssicherung (Soll / Abzug)', [['telAbzug', 'Telefonie Abzug %', 100], ['pencilSoll', 'Pencil Soll %', 100], ['pencilAbzug', 'Pencil Abzug %', 100], ['werbSoll', 'Werbeversprechen Soll %', 100], ['werbAbzug', 'Werbeversprechen Abzug %', 100], ['intSoll', 'Interessenten Soll', 1], ['intAbzug', 'Interessenten Abzug %', 100], ['tvqSoll', 'TV-Quote Soll %', 100], ['tvqAbzug', 'TV-Quote Abzug %', 100], ['ergSoll', 'Ergebnissicherung Soll €', 1], ['ergAbzug', 'Ergebnissicherung Abzug %', 100]]],
       ['Absicherung', [['fix', 'Provisionsabsicherung €', 1]]],
       ['Zielpunkte (Info im PDF)', [['zielMarge', 'pers. Marge €', 1], ['zielNeu', 'MF Neu', 1], ['zielNeuC', 'Congstar Neu', 1], ['zielVvl', 'MF VVL', 1], ['zielVvlC', 'Congstar VVL', 1], ['zielDp', 'DP', 1], ['zielTp', 'TP', 1], ['zielFnVvl', 'FN VVL', 1], ['zielKs', 'KS', 1], ['zielZub', 'Zubehör €', 1]]]
     ],
@@ -1592,7 +1599,7 @@ function Sheet({ inp, res, R }) {
         {res.sl && <tr className={res.sl.betrag ? 'pos' : 'zero'}><td>Shopleiter-Provision<small>Ziel {eur(res.sl.ziel)} · Ist {eur(res.sl.ist)} · {pf(res.sl.quote)}</small></td><td className="amt">{eur(res.sl.betrag)}</td></tr>}
         {res.qual.map(x => (
           <tr key={x.row} className={x.betrag ? 'neg' : 'zero'}>
-            <td>{x.label}<small>{x.rated ? `Soll ${fmtQ(x, x.soll)} · Ist ${fmtQ(x, x.ist)}` : x.optional ? 'fehlt – nicht bewertet' : 'fehlt – Abzug'}</small></td>
+            <td>{x.label}<small>{x.rated ? `Soll ${fmtQ(x, x.soll)}${x.abwTage > 0 ? ` (bei ${num(x.abwTage)} Abwesenheitstagen)` : ''} · Ist ${fmtQ(x, x.ist)}` : x.optional ? 'fehlt – nicht bewertet' : 'fehlt – Abzug'}</small></td>
             <td className="amt">{eur(x.betrag)}</td>
           </tr>))}
         {res.msy.label && <tr className={res.msy.betrag ? 'pos' : 'zero'}><td>{res.msy.label}</td><td className="amt">{eur(res.msy.betrag)}</td></tr>}
