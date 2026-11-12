@@ -33,3 +33,13 @@ Button „Historie“ (oben): Tabelle aller Provisionen je Mitarbeiter und Monat
 - Die Historie ist Teil der Sicherung (JSON).
 
 Alle Daten bleiben lokal im Browser (localStorage). Keine Daten werden hochgeladen, die Historie liegt nicht im Repository.
+
+## Vorschau Provision
+
+Button **Vorschau** (oben): simulierte Hochrechnung der Provision für den laufenden Monat.
+
+1. Portal-Tabelle (Zeitraum 1. bis Monatsende, Spalten NV, NV Kombi, VVL, DSL, DSL VVL, HW, Versicherung, O2 TV, Onlineschutz) als Excel/CSV einlesen oder kopieren und einfügen.
+2. Die Stückzahlen werden mit Faktor = Verkaufstage gesamt ÷ Verkaufstage bis Stand hochgerechnet (Mo–Sa, ohne Feiertage Baden-Württemberg; Faktor und Stand änderbar).
+3. Provision wird mit den normalen Regeln berechnet, daneben Vormonat und Differenz.
+
+Annahmen: Qualitätsziele „als erreicht“ oder „wie Vormonat“ (wählbar), Telefonie nach Abwesenheitstagen (pro Zeile eintragbar), Zubehör-Marge/Fachhandel/Kombi Data wie Vormonat, Shopleiter-Provision ohne Marge-Ist = 0. Nur o2 Shops. Die Daten bleiben ausschließlich im Browser.

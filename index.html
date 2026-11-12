@@ -258,6 +258,7 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
 .gen2 .primary{padding:11px 18px;font-size:.95rem}
 .gen2 .btn-s{display:inline-block;width:auto;margin:0;padding:10px 14px;font-size:.88rem}
 .primary.out{background:#fff;color:var(--blue);border:1px solid var(--blue)}
+.mut{color:var(--muted);font-size:.78rem}
 </style>
 </head><body><div id="root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -1996,6 +1997,219 @@ function Historie({ hist, setHist, title, profil, onBack, defJahr }) {
   );
 }
 
+// ---------- Vorschau: Hochrechnung der Provision aus einem Zwischenstand (nur lokal im Browser) ----------
+const PREV_COLS = { po: 'nv', kombi: 'nvkombi', vvl: 'vvl', dsl: 'dsl', dslVvl: 'dslvvl', handys: 'hw', ks: 'versicherung', tv: 'o2tv', schutzOnline: 'onlineschutz' };
+const PREV_LABEL = { po: 'NV', kombi: 'NV Kombi', vvl: 'VVL', dsl: 'DSL', dslVvl: 'DSL VVL', handys: 'HW', ks: 'Versicherung', tv: 'O2 TV', schutzOnline: 'Onlineschutz' };
+const normHead = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');
+const prevNum = v => { if (typeof v === 'number') return isFinite(v) ? v : null; const t = String(v == null ? '' : v).replace(/[€\s]/g, ''); return t ? parseBetrag(t) : null; };
+const isoD = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const fromIso = t => { const [y, m, d] = String(t).split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1); };
+function holidaysBW(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1;
+  const easter = new Date(y, mo - 1, da), add = n => { const x = new Date(easter); x.setDate(x.getDate() + n); return isoD(x); };
+  return new Set([`${y}-01-01`, `${y}-01-06`, `${y}-05-01`, `${y}-10-03`, `${y}-11-01`, `${y}-12-25`, `${y}-12-26`, add(-2), add(1), add(39), add(50), add(60)]);
+}
+// Verkaufstage: Montag bis Samstag ohne Feiertage Baden-Württemberg
+function workdays(from, to) {
+  let n = 0; const H = {};
+  for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) { const y = d.getFullYear(); H[y] = H[y] || holidaysBW(y); if (d.getDay() !== 0 && !H[y].has(isoD(d))) n++; }
+  return n;
+}
+function parsePrevGrid(grid) {
+  const rows = grid.map(r => r.map(c => c == null ? '' : c));
+  const hi = rows.findIndex(r => { const h = r.map(normHead); return h.includes('vvl') && h.includes('dsl'); });
+  if (hi < 0) throw new Error('Keine Kopfzeile mit VVL und DSL gefunden.');
+  const head = rows[hi].map(normHead), col = {};
+  Object.entries(PREV_COLS).forEach(([k, h]) => { const i = head.indexOf(h); if (i >= 0) col[k] = i; });
+  if (col.po == null && head.indexOf('poges') >= 0) col.po = head.indexOf('poges');
+  if (col.po == null) throw new Error('Spalte „NV“ (oder „PO ges.“) fehlt.');
+  let zeitraum = null;
+  rows.slice(0, hi + 1).forEach(r => r.forEach(c => {
+    const m = !zeitraum && /(\d{1,2})\.(\d{1,2})\.(\d{4})\s*[-–]\s*(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(String(c));
+    if (m) zeitraum = { von: `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`, bis: `${m[6]}-${m[5].padStart(2, '0')}-${m[4].padStart(2, '0')}` };
+  }));
+  const used = new Set(Object.values(col)), width = Math.max(...rows.map(r => r.length));
+  let nc = 0, best = -1;
+  for (let c = 0; c < width; c++) {
+    if (used.has(c)) continue;
+    const n = rows.slice(hi + 1).filter(r => { const v = String(r[c] == null ? '' : r[c]).trim(); return v && prevNum(v) == null; }).length;
+    if (n > best) { best = n; nc = c; }
+  }
+  const out = [];
+  for (let r = hi + 1; r < rows.length; r++) {
+    const name = String(rows[r][nc] == null ? '' : rows[r][nc]).trim();
+    if (!name || /^(summe|gesamt|total)\b/i.test(name) || /eintr/i.test(name)) continue;
+    const vals = {}; let any = false;
+    Object.entries(col).forEach(([k, i]) => { const v = prevNum(rows[r][i]); vals[k] = v == null ? 0 : v; if (v != null) any = true; });
+    if (any) out.push({ name, vals });
+  }
+  if (!out.length) throw new Error('Keine Datenzeilen gefunden.');
+  return { zeitraum, cols: Object.keys(col), rows: out };
+}
+function textToGrid(t) {
+  const lines = String(t).split(/\r?\n/).filter(l => l.trim());
+  const dl = ['\t', ';', ','].find(d => lines.slice(0, 6).some(l => l.includes(d))) || '\t';
+  return lines.map(l => l.split(dl).map(c => c.trim().replace(/^"|"$/g, '')));
+}
+
+function Vorschau({ data, R, hist, tzSet, slSet, esSet, onBack }) {
+  const isO2 = CUR.id === 'o2';
+  const [raw, setRaw] = useState(() => load(pk('prev'), null));
+  useEffect(() => save(pk('prev'), raw), [raw]);
+  const [stand, setStand] = useState(() => isoD(new Date()));
+  const [fOv, setFOv] = useState('');
+  const [qm, setQm] = useState('erreicht');
+  const [abw, setAbw] = useState({});
+  const [paste, setPaste] = useState(null);
+  const [msg, setMsg] = useState('');
+  const fileRef = useRef();
+
+  function applyGrid(grid, name) {
+    try {
+      const p = parsePrevGrid(grid);
+      setRaw({ file: name, at: new Date().toISOString(), ...p });
+      if (p.zeitraum) { const t = new Date(), bis = fromIso(p.zeitraum.bis), von = fromIso(p.zeitraum.von); setStand(isoD(t >= von && t <= bis ? t : bis)); }
+      setMsg(`${p.rows.length} Zeilen aus „${name}“ eingelesen.`);
+    } catch (e) { setMsg('Nicht eingelesen: ' + e.message); }
+  }
+  async function onFile(f) {
+    try {
+      let grid;
+      if (/\.xls[xm]$/i.test(f.name)) {
+        const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer());
+        const ws = wb.worksheets.find(w => !w.state || w.state === 'visible') || wb.worksheets[0];
+        grid = []; for (let r = 1; r <= ws.rowCount; r++) { const row = []; for (let c = 1; c <= Math.max(ws.columnCount, 1); c++) row.push(CUR.core.cellVal(ws.getCell(r, c))); grid.push(row); }
+      } else grid = textToGrid(await f.text());
+      applyGrid(grid, f.name);
+    } catch (e) { setMsg('Datei konnte nicht gelesen werden: ' + e.message); }
+  }
+
+  const von = raw && raw.zeitraum ? fromIso(raw.zeitraum.von) : (() => { const d = fromIso(stand); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+  const bis = raw && raw.zeitraum ? fromIso(raw.zeitraum.bis) : new Date(von.getFullYear(), von.getMonth() + 1, 0);
+  const standD = fromIso(stand), monat = MONATE[von.getMonth()], jahr = von.getFullYear();
+  const elapsed = workdays(von, standD < bis ? standD : bis), total = Math.max(workdays(von, bis), 1);
+  const autoF = elapsed > 0 ? total / elapsed : 1;
+  const fOvN = parseFloat(String(fOv).replace(',', '.'));
+  const factor = fOvN > 0 ? fOvN : autoF;
+  const f2 = v => v.toLocaleString('de-DE', { maximumFractionDigits: 2 });
+
+  const { rows, unmatched } = useMemo(() => {
+    if (!raw || !data || !isO2) return { rows: [], unmatched: [] };
+    const list = raw.rows.map(r => ({ ...r, ...CUR.core.splitNachVor(r.name) }));
+    const used = new Set(), mi = monIdx(monat);
+    const telSoll = t => t <= R.telTage1 ? R.telSoll1 : t <= R.telTage2 ? R.telSoll2 : t <= R.telTage3 ? R.telSoll3 : R.telSoll4;
+    const out = [];
+    data.employees.forEach(e => {
+      const m = CUR.core.matchDne(e.fullName, e.sheet, list); if (!m) return; used.add(m.name);
+      const hr = k => Math.round((m.vals[k] || 0) * factor);
+      const pm = Object.keys(e.rows).filter(x => monIdx(x) >= 0 && monIdx(x) < mi && e.rows[x].active).sort((a, b) => monIdx(b) - monIdx(a))[0];
+      const prow = pm ? e.rows[pm].inp : {};
+      const abwD = Number(String(abw[e.sheet] || '').replace(',', '.')) || 0;
+      const sl = slSet[e.sheet] || {};
+      const qv = qm === 'erreicht' ? { werb: Math.round(R.werbSoll * 100), pencil: Math.round(R.pencilSoll * 100), marketing: telSoll(abwD), msy: '' } : { werb: prow.werb ?? '', pencil: prow.pencil ?? '', marketing: prow.marketing ?? '', msy: prow.msy ?? '' };
+      const inp = { ...CUR.BLANK, name: e.sheet, vollerName: e.fullName, monat, jahr: String(jahr),
+        po: hr('po'), kombi: hr('kombi'), vvl: hr('vvl'), dsl: hr('dsl'), dslVvl: hr('dslVvl'), handys: hr('handys'), ks: hr('ks'), tv: hr('tv'), schutzOnline: hr('schutzOnline'),
+        kombiData: prow.kombiData ?? '', zubStk: prow.zubStk ?? '', zubMarge: prow.zubMarge ?? '', fachhandel: prow.fachhandel ?? '', urlaub: abwD || '', krank: '', ...qv,
+        teilzeit: !!tzSet[e.sheet], einstiegsfrei: !!esSet[`${jahr}|${monat}|${e.sheet}`], shopleiter: !!sl.on, slRate1: sl.r1 ?? '', slRate2: sl.r2 ?? '', slZiel: sl.ziel ?? '', slIst: '' };
+      const res = calc(inp, R);
+      const pj = mi === 0 ? jahr - 1 : jahr, pmon = MONATE[(mi + 11) % 12], nm = String(e.fullName).trim().toLowerCase();
+      const ph = Object.values(hist || {}).find(h => String(h.jahr) === String(pj) && h.monat === pmon && (h.sheet === e.sheet || String(h.name || '').trim().toLowerCase() === nm));
+      out.push({ e, m, inp, res, hr, prev: ph ? ph.total : null });
+    });
+    return { rows: out, unmatched: raw.rows.filter(r => !used.has(r.name)) };
+  }, [raw, data, R, factor, qm, abw, monat, jahr, tzSet, slSet, esSet, hist, isO2]);
+
+  const sumT = rows.reduce((s, x) => s + x.res.total, 0);
+  const sumPrev = rows.reduce((s, x) => s + (x.prev == null ? 0 : x.prev), 0), nPrev = rows.filter(x => x.prev != null).length;
+  const cell = (x, k) => { const ist = x.m.vals[k] || 0, h = x.hr(k); return <td key={k} className="n"><span className="mut">{ist} →</span> <b>{h}</b></td>; };
+  const SH = CUR.GS_LABELS;
+  return (
+    <div className="wrap">
+      <div className="topbar">
+        <h1>Vorschau Provision <span className="mode">{CUR.title}</span></h1>
+        <div className="topbtns"><button className="btn-s" onClick={onBack}>← Zurück</button></div>
+      </div>
+      {!isO2 ? <p className="empty">Die Vorschau gibt es zunächst für o2 Shops. Bitte oben auf „o2 Shops“ umschalten.</p> : (<>
+        {msg && <p className="msg">{msg}</p>}
+        <div className="card">
+          <h2>1 · Zwischenstand einlesen</h2>
+          <p className="empty" style={{ margin: '0 0 12px' }}>Tabelle aus dem Portal (Zeitraum 1. bis Monatsende) als Excel/CSV ablegen oder die Tabelle kopieren und hier einfügen. Die Daten bleiben nur in diesem Browser.</p>
+          <div className="histform">
+            <button className="primary" onClick={() => fileRef.current.click()}>Datei einlesen</button>
+            <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.csv,.txt,.tsv" hidden onChange={e => { const f = e.target.files[0]; e.target.value = ''; if (f) onFile(f); }} />
+            <button className="ghost" onClick={() => setPaste(paste == null ? '' : null)}>Tabelle einfügen</button>
+            {raw && <button className="link" onClick={() => { setRaw(null); setMsg(''); }}>Daten entfernen</button>}
+          </div>
+          {paste != null && (
+            <div style={{ marginTop: 12 }}>
+              <textarea className="notes" rows={6} placeholder="Tabelle hier einfügen (Strg+V)" value={paste} onChange={e => setPaste(e.target.value)} />
+              <div className="modal-act"><button className="ghost" onClick={() => setPaste(null)}>Abbrechen</button><button className="primary" disabled={!paste.trim()} onClick={() => { applyGrid(textToGrid(paste), 'Eingefügte Tabelle'); setPaste(null); }}>Übernehmen</button></div>
+            </div>)}
+          {raw && <p className="empty" style={{ margin: '12px 0 0', fontSize: '.85rem' }}>{raw.file} · {raw.rows.length} Zeilen{raw.zeitraum ? ` · Zeitraum ${fromIso(raw.zeitraum.von).toLocaleDateString('de-DE')} bis ${fromIso(raw.zeitraum.bis).toLocaleDateString('de-DE')}` : ''} · Spalten: {raw.cols.map(k => PREV_LABEL[k]).join(', ')}</p>}
+        </div>
+        {raw && !data && <p className="empty">Für die Zuordnung der Namen bitte zuerst die Performance-Excel einlesen.</p>}
+        {raw && data && (<>
+          <div className="card">
+            <h2>2 · Hochrechnung</h2>
+            <div className="tbfields" style={{ marginLeft: 0 }}>
+              <label>Stand (inkl.) <input type="date" value={stand} onChange={e => setStand(e.target.value)} /></label>
+              <label>Faktor <input className="w-y" inputMode="decimal" placeholder={f2(autoF)} value={fOv} onChange={e => setFOv(e.target.value)} /></label>
+              <label>Qualitätsziele <select value={qm} onChange={e => setQm(e.target.value)}><option value="erreicht">als erreicht annehmen</option><option value="vormonat">wie Vormonat</option></select></label>
+            </div>
+            <p className="empty" style={{ margin: '10px 0 0', fontSize: '.88rem' }}>{elapsed} von {total} Verkaufstagen (Mo–Sa, ohne Feiertage Baden-Württemberg) bis {standD.toLocaleDateString('de-DE')} → Faktor <b>×{f2(factor)}</b>. Stückzahlen werden gerundet.</p>
+          </div>
+          <div className="card tablecard">
+            <div className="tablehead2">
+              <h2>{monat} {jahr}: simulierte Provision</h2>
+              <span className="sub">{rows.length} Mitarbeiter zugeordnet{unmatched.length ? ` · ${unmatched.length} Zeilen der Datei ohne Zuordnung` : ''}</span>
+            </div>
+            {rows.length > 0 ? (
+              <div className="scroll">
+                <table className="list c">
+                  <thead><tr>
+                    <th>Mitarbeiter</th><th className="n">PO</th><th className="n">VVL</th><th className="n">DSL</th><th className="n">KS</th><th className="n">TV</th><th className="n">OS</th>
+                    <th>Abw. Tage</th><th className="r">Provision simuliert</th><th className="r">Vormonat</th><th className="r">Differenz</th>
+                  </tr></thead>
+                  <tbody>
+                    {rows.map(x => {
+                      const ab = x.res.qual.filter(q => q.betrag < 0);
+                      const diff = x.prev == null ? null : x.res.total - x.prev;
+                      return (
+                        <tr key={x.e.sheet}>
+                          <td className="who"><strong>{x.e.fullName}</strong>
+                            {x.res.fixGreift && <small className="tag">Fix greift</small>}
+                            {x.inp.shopleiter && <small className="tag note" title="Marge Ist fehlt, daher keine Shopleiter-Provision">Shopleiter ohne Marge</small>}
+                            {ab.length > 0 && <div className="abz">{ab.map(q => <span key={q.row} className="chip neg">{SH[q.row]} {eur(q.betrag)}</span>)}</div>}
+                          </td>
+                          <td className="n"><span className="mut">{(x.m.vals.po || 0) + (x.m.vals.kombi || 0)} →</span> <b>{x.hr('po') + x.hr('kombi')}</b></td>
+                          {cell(x, 'vvl')}{cell(x, 'dsl')}{cell(x, 'ks')}{cell(x, 'tv')}{cell(x, 'schutzOnline')}
+                          <td className="sp"><input className="mini xs" inputMode="decimal" aria-label={'Abwesenheitstage ' + x.e.fullName} value={abw[x.e.sheet] ?? ''} placeholder="0" onChange={ev => setAbw(a => ({ ...a, [x.e.sheet]: ev.target.value }))} /></td>
+                          <td className="r pay"><strong>{eur(x.res.total)}</strong></td>
+                          <td className="r">{x.prev == null ? '–' : eur(x.prev)}</td>
+                          <td className="r" style={{ color: diff == null ? undefined : diff < 0 ? 'var(--no)' : 'var(--ok)', fontWeight: 600 }}>{diff == null ? '–' : (diff > 0 ? '+' : '') + eur(diff)}</td>
+                        </tr>);
+                    })}
+                  </tbody>
+                  <tfoot><tr>
+                    <td colSpan={8}>Summe · Ø {eur(sumT / rows.length)}</td>
+                    <td className="r"><b>{eur(sumT)}</b></td>
+                    <td className="r">{nPrev ? eur(sumPrev) : '–'}</td>
+                    <td className="r">{nPrev === rows.length ? (sumT - sumPrev > 0 ? '+' : '') + eur(sumT - sumPrev) : '–'}</td>
+                  </tr></tfoot>
+                </table>
+              </div>
+            ) : <p className="empty" style={{ padding: '0 16px 16px' }}>Kein Name aus der Datei konnte einem Mitarbeiter zugeordnet werden.</p>}
+          </div>
+          {unmatched.length > 0 && <details className="empty" style={{ margin: '0 0 12px' }}><summary>{unmatched.length} Zeilen ohne Zuordnung</summary><p style={{ margin: '6px 0 0' }}>{unmatched.map(r => r.name).join(', ')}</p></details>}
+          <p className="empty" style={{ fontSize: '.82rem' }}>Simulation, keine verbindliche Abrechnung. Annahmen: Qualitätsziele {qm === 'erreicht' ? 'werden als erreicht angenommen (kein Abzug)' : 'wie im letzten Monat der Performance-Datei'}; Zubehör-Marge, Fachhandel und Kombi Data wie im Vormonat; Shopleiter-Provision ohne Marge-Ist = 0; Einstiegsschwelle und Azubi/Teilzeit wie im Dashboard; Online-Schutz PLUS, Prepaid und INT fließen nicht ein.</p>
+        </>)}
+      </>)}
+    </div>
+  );
+}
+
 // ---------- Unterschrift am Handy: Die Daten stecken im Link (#s=…), es gibt keinen Server ----------
 const b64uEnc = bytes => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
 const b64uDec = s => { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const b = atob(s); const a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
@@ -2370,6 +2584,7 @@ function App() {
   // Historie (lokal): je Jahr|Monat|Mitarbeiter ein Eintrag mit der Auszahlung
   const [hist, setHist] = useState(() => load(pk('hist'), {}));
   const [showHist, setShowHist] = useState(false);
+  const [showPrev, setShowPrev] = useState(false);
   useEffect(() => save(pk('hist'), hist), [hist]);
   // Einmalig: bereits versendete Abrechnungen aus den Versandnachweisen übernehmen
   useEffect(() => { setHist(h => histFromSent(ov, data ? data.employees : [], h)); }, []);
@@ -2569,6 +2784,8 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
         onXlsx={() => oneXlsx(x.inp)} onPdf={() => onePdf(x.inp)} /></div>);
   }
 
+  if (showPrev) return (<Vorschau data={data} R={R} hist={hist} tzSet={tzSet} slSet={slSet} esSet={esSet} onBack={() => setShowPrev(false)} />);
+
   if (showHist) return (<div className="wrap"><Header /><Historie hist={hist} setHist={setHist} title={CUR.title} profil={CUR.id} defJahr={meta.jahr} onBack={() => setShowHist(false)} /></div>);
 
   const closeMenu = e => { const d = e.currentTarget.closest('details'); if (d) d.open = false; };
@@ -2593,6 +2810,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
         <h1>Provisionsabrechnung <span className="mode">{CUR.title}</span></h1>
         <div className="topbtns">
           <button className="btn-s" onClick={refreshMonth} title="Stellt den aktuellen Kalendermonat ein, ohne frühere Abrechnungen oder Versandnachweise zu löschen">↻ Monat aktualisieren</button>
+          <button className="btn-s" onClick={() => setShowPrev(true)} title="Hochrechnung der Provision aus dem aktuellen Zwischenstand">Vorschau</button>
           <button className="btn-s" onClick={() => setShowHist(true)} title="Alle Provisionen je Mitarbeiter und Monat mit Durchschnitten">Historie</button>
           <button className="btn-s" onClick={() => sigRef.current.click()} title="Unterschriebene PDFs vom Handy einlesen (mehrere möglich)">Unterschriften einlesen</button>
           <input ref={sigRef} type="file" accept=".pdf,application/pdf" multiple hidden onChange={e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) importSigs(fs); }} />
