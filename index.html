@@ -2627,6 +2627,20 @@ function App() {
   const relayRef = useRef(relay);
   const sigReqRef = useRef(sigReq);
   useEffect(() => { relayRef.current = relay; }, [relay]);
+  const [relayBox, setRelayBox] = useState(null);
+  const [relayPw, setRelayPw] = useState('');
+  useEffect(() => {
+    if (loadRelay()) return;
+    fetch('relay-seed.enc.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => { if (j && j.ct) setRelayBox(j); }).catch(() => {});
+  }, []);
+  async function unlockRelay() {
+    try {
+      const r = await decryptSeed(relayBox, relayPw);
+      if (!REPO_RE.test(r.repo || '') || !r.token) throw new Error('x');
+      saveRelay({ repo: r.repo, token: r.token }); setRelayBox(null); setRelayPw('');
+      setMsg('Automatischer Rückweg der Unterschrift ist eingerichtet und gespeichert.');
+    } catch (e) { setMsg('Passwort falsch oder Datei beschädigt.'); }
+  }
   const saveRelay = r => { try { localStorage.setItem('provi_relay', JSON.stringify(r)); } catch (e) {} relayRef.current = r; setRelay(r); };
   useEffect(() => { sigReqRef.current = sigReq; save(pk('sigReq'), sigReq); }, [sigReq]);
   const openSign = sheet => {
@@ -2910,6 +2924,16 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
           info={data?.dne ? `${data.dne.list.length} Personen` : 'ablegen oder klicken'} title={data?.dne ? data.dne.file : 'Spalte A „Nachname Vorname“, Spalte D DNE % – ersetzt den Werbeversprechen-Wert'} />
       </div>
       {msg && <p className="msg">{msg}</p>}
+      {relayBox && !relay && (
+        <div className="card special">
+          <h2>Unterschrift-Rückweg freischalten</h2>
+          <p className="empty" style={{ margin: '0 0 12px' }}>Repository und Token liegen verschlüsselt bereit. Passwort einmal eingeben, danach ist der automatische Rückweg in diesem Browser gespeichert.</p>
+          <div className="histform">
+            <label className="field"><span>Passwort</span><input type="password" autoComplete="off" value={relayPw} onChange={e => setRelayPw(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') unlockRelay(); }} /></label>
+            <button className="primary" onClick={unlockRelay} disabled={!relayPw.trim()}>Freischalten</button>
+            <button className="ghost" onClick={() => setRelayBox(null)}>Später</button>
+          </div>
+        </div>)}
       {seedBox && (
         <div className="card special">
           <h2>Historie freischalten</h2>
