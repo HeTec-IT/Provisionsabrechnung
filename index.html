@@ -1462,7 +1462,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   if (typeof module !== 'undefined') module.exports = root.ProviFH;
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
-<script type="text/babel" data-presets="react">const { useState, useMemo, useEffect, useRef } = React;
+<script type="text/babel" data-presets="react">const { useState, useMemo, useEffect, useRef, useCallback } = React;
 const { parseTelefonie, matchTelefonie, parseDne, matchDne, MONATE, eur, pf } = window.Provi;
 let CUR = null; // aktives Profil (o2 / Fachhandel)
 const calc = (...x) => CUR.core.calc(...x);
@@ -1855,9 +1855,9 @@ async function decryptSeed(seed, pw) {
   return JSON.parse(new TextDecoder().decode(pt));
 }
 
-function Historie({ hist, setHist, title, profil, onBack, defJahr }) {
+function Historie({ vis, hist, setHist, title, profil, onBack, defJahr }) {
   const fileRef = useRef();
-  const all = useMemo(() => Object.values(hist), [hist]);
+  const all = useMemo(() => Object.values(hist).filter(h => !vis || vis(h.sheet)), [hist, vis]);
   const jahre = useMemo(() => [...new Set(all.map(e => String(e.jahr)))].sort(), [all]);
   const [jahr, setJahr] = useState(() => jahre.includes(String(defJahr)) ? String(defJahr) : (jahre[jahre.length - 1] || 'alle'));
   const [f, setF] = useState({ name: '', monat: MONATE[new Date().getMonth()], jahr: String(defJahr), betrag: '' });
@@ -2064,7 +2064,7 @@ function textToGrid(t) {
   return lines.map(l => l.split(dl).map(c => c.trim().replace(/^"|"$/g, '')));
 }
 
-function Vorschau({ data, R, hist, tzSet, slSet, esSet, onBack }) {
+function Vorschau({ vis, data, R, hist, tzSet, slSet, esSet, onBack }) {
   const isO2 = CUR.id === 'o2';
   const [raw, setRaw] = useState(() => load(pk('prev'), null));
   useEffect(() => save(pk('prev'), raw), [raw]);
@@ -2112,7 +2112,7 @@ function Vorschau({ data, R, hist, tzSet, slSet, esSet, onBack }) {
     const telSoll = t => t <= R.telTage1 ? R.telSoll1 : t <= R.telTage2 ? R.telSoll2 : t <= R.telTage3 ? R.telSoll3 : R.telSoll4;
     const out = [];
     data.employees.forEach(e => {
-      const m = CUR.core.matchDne(e.fullName, e.sheet, list); if (!m) return; used.add(m.name);
+      const m = CUR.core.matchDne(e.fullName, e.sheet, list); if (!m) return; used.add(m.name); if (vis && !vis(e.sheet)) return;
       const hr = k => Math.round((m.vals[k] || 0) * factor);
       const pm = Object.keys(e.rows).filter(x => monIdx(x) >= 0 && monIdx(x) < mi && e.rows[x].active).sort((a, b) => monIdx(b) - monIdx(a))[0];
       const prow = pm ? e.rows[pm].inp : {};
@@ -2129,7 +2129,7 @@ function Vorschau({ data, R, hist, tzSet, slSet, esSet, onBack }) {
       out.push({ e, m, inp, res, hr, prev: ph ? ph.total : null });
     });
     return { rows: out, unmatched: raw.rows.filter(r => !used.has(r.name)) };
-  }, [raw, data, R, factor, qm, abw, monat, jahr, tzSet, slSet, esSet, hist, isO2]);
+  }, [raw, data, R, factor, qm, abw, monat, jahr, tzSet, slSet, esSet, hist, isO2, vis]);
 
   const sumT = rows.reduce((s, x) => s + x.res.total, 0);
   const sumPrev = rows.reduce((s, x) => s + (x.prev == null ? 0 : x.prev), 0), nPrev = rows.filter(x => x.prev != null).length;
@@ -2576,7 +2576,11 @@ function App() {
   const key = sheet => `${meta.jahr}|${meta.monat}|${sheet}`;
   const shared = { monat: meta.monat, jahr: meta.jahr, ort: meta.ort, datum: meta.datum };
 
-  const list = useMemo(() => {
+  // Anzeige: null = alle Mitarbeiter, sonst nur die gewählten (Blattnamen). Nicht Gewählte fehlen auch in Summen, PDF, ZIP, Vorschau und Historie.
+  const [show, setShow] = useState(() => load(pk('show'), null));
+  useEffect(() => save(pk('show'), show), [show]);
+  const vis = useCallback(sheet => !show || show.includes(sheet), [show]);
+  const listAll = useMemo(() => {
     if (!data || !meta.monat) return [];
     return data.employees.filter(e => e.rows[meta.monat]).map(e => {
       const row = e.rows[meta.monat];
@@ -2601,6 +2605,7 @@ function App() {
       return { e, row, inp, include, todo: todoF, tel, credited, sent, sig: o.sig || null, sigChanged, sentChanged: !!(sent && Math.abs((sent.total || 0) - res0.total) > 0.004), edited: !!(o.fields && Object.keys(o.fields).some(k => !['sonderBetrag', 'sonderText', 'slZiel', 'slIst', 'notiz'].includes(k))), res: res0 };
     });
   }, [data, meta, ov, R, slSet, tzSet, esSet]);
+  const list = useMemo(() => listAll.filter(x => vis(x.e.sheet)), [listAll, vis]);
   const chosen = list.filter(x => x.include);
   const sum = chosen.reduce((s, x) => s + x.res.total, 0);
 
@@ -2878,9 +2883,9 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
         onXlsx={() => oneXlsx(x.inp)} onPdf={() => onePdf(x.inp)} /></div>);
   }
 
-  if (showPrev) return (<Vorschau data={data} R={R} hist={hist} tzSet={tzSet} slSet={slSet} esSet={esSet} onBack={() => setShowPrev(false)} />);
+  if (showPrev) return (<Vorschau vis={vis} data={data} R={R} hist={hist} tzSet={tzSet} slSet={slSet} esSet={esSet} onBack={() => setShowPrev(false)} />);
 
-  if (showHist) return (<div className="wrap"><Header /><Historie hist={hist} setHist={setHist} title={CUR.title} profil={CUR.id} defJahr={meta.jahr} onBack={() => setShowHist(false)} /></div>);
+  if (showHist) return (<div className="wrap"><Header /><Historie vis={vis} hist={hist} setHist={setHist} title={CUR.title} profil={CUR.id} defJahr={meta.jahr} onBack={() => setShowHist(false)} /></div>);
 
   const closeMenu = e => { const d = e.currentTarget.closest('details'); if (d) d.open = false; };
   const metaFields = (
@@ -2892,6 +2897,11 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
       <label>Jahr <input className="w-y" inputMode="numeric" aria-label="Jahr" value={meta.jahr} onChange={e => setMeta(m => ({ ...m, jahr: e.target.value }))} /></label>
       <label>Ort <input className="w-o" aria-label="Ort (Vereinbarung)" placeholder="Ort" value={meta.ort} onChange={e => setMeta(m => ({ ...m, ort: e.target.value }))} /></label>
       <label>Datum <input className="w-d" aria-label="Datum" value={meta.datum} onChange={e => setMeta(m => ({ ...m, datum: e.target.value }))} /></label>
+      {data && data.employees.length > 0 && <details className="menu"><summary className="btn-s" title="Nur ausgewählte Mitarbeiter anzeigen, damit andere nicht alle Provisionen sehen">{show ? `Anzeige: ${data.employees.filter(e => show.includes(e.sheet)).length} von ${data.employees.length} ▾` : 'Anzeige: alle ▾'}</summary><div className="pop" style={{ maxHeight: '60vh', overflow: 'auto', minWidth: 260 }}>
+        <button onClick={() => setShow(null)}>Alle anzeigen</button>
+        <button onClick={() => setShow([])}>Keine anzeigen</button>
+        {data.employees.map(e => <label key={e.sheet} className="check" style={{ padding: '7px 12px', margin: 0 }}><input type="checkbox" checked={vis(e.sheet)} onChange={ev => setShow(cur => { const base = cur || data.employees.map(x => x.sheet); const n = ev.target.checked ? [...new Set([...base, e.sheet])] : base.filter(z => z !== e.sheet); return n.length === data.employees.length ? null : n; })} /> {e.fullName}</label>)}
+      </div></details>}
       {CUR.features.einstieg && list.length > 0 && <details className="menu"><summary className="btn-s">Alle: Einstiegsschwelle ▾</summary><div className="pop">
         <button onClick={e => { closeMenu(e); setEsAll(true); }} title="Bei allen Mitarbeitern keine Einstiegsschwelle">Bei allen: keine Einstiegsschwelle</button>
         <button onClick={e => { closeMenu(e); setEsAll(false); }} title="Bei allen Mitarbeitern gilt die Einstiegsschwelle">Bei allen: Einstiegsschwelle gilt</button>

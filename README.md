@@ -44,3 +44,7 @@ Button **Vorschau** (oben): simulierte Hochrechnung der Provision für den laufe
 3. Provision wird mit den normalen Regeln berechnet, daneben Vormonat und Differenz.
 
 Annahmen: Qualitätsziele „als erreicht“ oder „wie Vormonat“ (wählbar), Telefonie nach Abwesenheitstagen (pro Zeile eintragbar), Zubehör-Marge/Fachhandel/Kombi Data wie Vormonat, Shopleiter-Provision ohne Marge-Ist = 0. Nur o2 Shops. Die Daten bleiben ausschließlich im Browser.
+
+## Anzeige begrenzen
+
+Oben in der Monatsleiste: **Anzeige: alle ▾**. Dort Mitarbeiter an- oder abwählen. Nicht gewählte fehlen in Tabelle, Summe, PDF/ZIP/E-Mail, Vorschau und Historie. Die Auswahl bleibt im Browser gespeichert; „Alle anzeigen“ hebt sie auf. Das ist ein Sichtschutz, keine Sperre.
