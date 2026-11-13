@@ -48,3 +48,7 @@ Annahmen: Qualitätsziele „als erreicht“ oder „wie Vormonat“ (wählbar),
 ## Anzeige begrenzen
 
 Oben in der Monatsleiste: **Anzeige: alle ▾**. Dort Mitarbeiter an- oder abwählen. Nicht gewählte fehlen in Tabelle, Summe, PDF/ZIP/E-Mail, Vorschau und Historie. Die Auswahl bleibt im Browser gespeichert; „Alle anzeigen“ hebt sie auf. Das ist ein Sichtschutz, keine Sperre.
+
+## Unterschriebene PDFs gesammelt laden
+
+Abgerufene Unterschriften bleiben lokal im Browser gespeichert. Der Button **⬇ Unterschriebene (n) als ZIP** (oben) lädt alle sichtbaren unterschriebenen PDFs als eine Datei, beliebig oft. „PDF ✍“ je Zeile lädt weiterhin ein einzelnes PDF.

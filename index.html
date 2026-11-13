@@ -2822,6 +2822,18 @@ function App() {
   }
   const zipName = () => `Provisionen_${safe(meta.monat)}_${meta.jahr}.zip`;
 
+  const signedList = list.filter(x => x.inp.signImg);
+  async function downloadSigned() {
+    if (!signedList.length) return;
+    setBusy('zipsig'); setMsg('');
+    try {
+      const zip = new JSZip();
+      signedList.forEach(x => zip.file(fname(x.inp, 'pdf').replace(/\.pdf$/, '_unterschrieben.pdf'), buildPdf(window.jspdf.jsPDF, x.inp, R).output('arraybuffer')));
+      download(new Blob([await zip.generateAsync({ type: 'uint8array' })], { type: 'application/zip' }), `Unterschriebene_Provisionen_${safe(meta.monat)}_${meta.jahr}.zip`);
+      setMsg(`${signedList.length} unterschriebene PDFs in einer ZIP-Datei gespeichert.`);
+    } catch (e) { setMsg('Fehler beim Erstellen: ' + e.message); }
+    setBusy('');
+  }
   async function generateAll() {
     if (!chosen.length) return;
     setBusy('zip'); setMsg('');
@@ -2916,6 +2928,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
           <button className="btn-s" onClick={refreshMonth} title="Stellt den aktuellen Kalendermonat ein, ohne frühere Abrechnungen oder Versandnachweise zu löschen">↻ Monat aktualisieren</button>
           <button className="btn-s" onClick={() => setShowPrev(true)} title="Hochrechnung der Provision aus dem aktuellen Zwischenstand">Vorschau</button>
           <button className="btn-s" onClick={() => setShowHist(true)} title="Alle Provisionen je Mitarbeiter und Monat mit Durchschnitten">Historie</button>
+          {signedList.length > 0 && <button className="btn-s sentbtn" onClick={downloadSigned} disabled={!!busy} title="Alle unterschriebenen PDFs als eine ZIP-Datei laden (kein Einzel-Download in den Downloads-Ordner)">⬇ Unterschriebene ({signedList.length}) als ZIP</button>}
           <button className="btn-s" onClick={() => sigRef.current.click()} title="Unterschriebene PDFs vom Handy einlesen (mehrere möglich)">Unterschriften einlesen</button>
           <input ref={sigRef} type="file" accept=".pdf,application/pdf" multiple hidden onChange={e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) importSigs(fs); }} />
           <details className="menu"><summary className="btn-s">Sicherung ▾</summary><div className="pop">
