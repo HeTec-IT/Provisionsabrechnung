@@ -10,8 +10,9 @@ PWA für die monatliche Provisionsabrechnung (o2).
 
 ## Unterschrift am Handy
 
-Button „Unterschrift (QR)“ je Mitarbeiter: Der Mitarbeiter scannt den QR-Code, sieht seine Abrechnung, unterschreibt mit dem Finger und schickt das unterschriebene PDF per Teilen-Menü zurück.
+Button „Unterschrift (QR)“ je Mitarbeiter: Der Mitarbeiter scannt den QR-Code und sieht sofort die echte PDF-Ansicht (Seite 1 Abrechnung, Seite 2 Zusatzvereinbarung). Tipp auf das Dokument oder „Unterschreiben“ öffnet das Unterschriftsfeld; mit einem Knopf wird auf beiden Seiten unterschrieben. Danach „Teilen“ (Outlook, Mail …) oder „PDF speichern". Im Dashboard steht „Unterschrift angekommen“ und „PDF ✍“ lädt das unterschriebene PDF.
 
+- Die PDF-Ansicht nutzt pdf.js (wird beim Öffnen der Unterschriftsseite von cdnjs geladen, wie die anderen Bibliotheken). Ohne Verbindung dazu erscheint die einfache Übersicht mit PDF-Vorschau im Browser.
 - Kein Server: Die Abrechnungsdaten stehen komprimiert im Link (Teil nach `#`, wird nie an einen Server gesendet). Interne Notizen sind nicht enthalten.
 - Das PDF entsteht auf dem Handy. Die Unterschrift steht im grünen Feld „Auszahlungsbetrag“ (Seite 1) und auf der Zeile „Arbeitnehmer“ (Seite 2), dazu Datum, Uhrzeit und Prüfcode.
 - Automatischer Rückweg (optional, nur über dein eigenes GitHub): Privates Repository anlegen und ein Fine-grained Token (nur dieses Repo, „Contents: Read and write“) im QR-Dialog eintragen; beides bleibt nur im Browser. Das Token steckt im QR-Link, das Handy legt die mit AES-256-GCM verschlüsselte Unterschrift (Schlüssel nur im Link nach `#`) als Datei im privaten Repo ab. Das Dashboard holt sie alle 15 Sekunden ab, entschlüsselt sie und löscht die Datei. Es gibt keinen weiteren Dienst.

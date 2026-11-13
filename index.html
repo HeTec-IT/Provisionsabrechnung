@@ -194,6 +194,16 @@ header h1 .mode{font-size:1rem;font-weight:600;color:var(--blue);vertical-align:
 .signcheck{display:flex;gap:8px;align-items:flex-start;margin:14px 0;font-size:.95rem}
 .sigarea{position:relative;border:2px dashed var(--line);border-radius:10px;background:#fff;margin-top:6px}
 .sigarea>span{position:absolute;left:12px;top:8px;color:#9AA3B2;font-size:.8rem;pointer-events:none}
+.pdfview{max-width:760px;margin:0 auto;padding:0 0 96px}
+.pv-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:14px 16px 6px}.pv-top span{color:var(--muted);font-size:.9rem}
+.pv-hint{margin:0 16px 8px;color:var(--muted);font-size:.9rem}
+.pv-banner{margin:6px 16px 10px;padding:12px 14px;border-radius:10px;font-size:.95rem;background:#E3F1E9;color:#0B5E30}.pv-banner.warn{background:#FFF4D6;color:#7A5200}
+.pdfhost{cursor:pointer}.pdfpage{background:#fff;box-shadow:0 1px 8px rgba(15,23,42,.22);margin:10px 10px 14px;line-height:0}.pdfpage canvas{display:block;width:100%;height:auto}
+.pv-bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom));z-index:20}
+.pv-bar>div{max-width:728px;margin:0 auto;display:flex;gap:8px}.pv-bar button{flex:1;padding:14px 10px;font-size:1rem}
+.pv-sheetbg{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.pv-sheet{background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:560px;max-height:92vh;overflow:auto;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.pv-sheet .signcheck{margin-top:0}.pv-sheetbtns{display:flex;gap:8px;margin-top:12px}.pv-sheetbtns button{padding:13px 10px}.pv-sheetbtns .primary{flex:1.6}
 .sigpad{display:block;width:100%;height:170px;touch-action:none;border-radius:10px}
 .sigbtns{display:flex;justify-content:flex-end;margin:6px 0 10px}
 
@@ -2287,7 +2297,7 @@ function FileChip({ label, info, title, loaded, busy, onFile }) {
     </div>);
 }
 
-function SignDialog({ x, meta, R, rq, relay, onRelay, onClose, onImport, onPoll, onUnmark }) {
+function SignDialog({ x, meta, R, rq, relay, onRelay, onClose, onImport, onPoll, onUnmark, onPdf }) {
   const impRef = useRef();
   const [cfg, setCfg] = useState(false);
   const [rf, setRf] = useState({ repo: (relay && relay.repo) || '', token: '' });
@@ -2319,10 +2329,12 @@ function SignDialog({ x, meta, R, rq, relay, onRelay, onClose, onImport, onPoll,
         <p className="modal-sub">{x.inp.vollerName || x.e.sheet} · {meta.monat} {meta.jahr} · <b>{eur(x.res.total)}</b></p>
         {lk && lk.svg ? <div className="qrbox" dangerouslySetInnerHTML={{ __html: lk.svg }} />
           : <p className="warnline">{lk ? (lk.err || 'Für einen QR-Code ist die Abrechnung zu groß. Bitte den Link teilen.') : 'Erzeuge QR-Code …'}</p>}
+        {x.sig && <p className="msg"><b>Unterschrift angekommen ✓</b> {new Date(x.sig.at).toLocaleString('de-DE')}{x.sigChanged ? ' · Betrag seitdem geändert, Unterschrift steht nicht im PDF' : ''}</p>}
         {lk && lk.code && <p className="modal-sub">Prüfcode <b>{lk.code}</b> · steht später im unterschriebenen PDF</p>}
         <label className="field"><span>Rückmeldung an (E-Mail, wird dem Mitarbeiter angezeigt)</span><input type="email" value={to} placeholder={`name@${MAIL_DOMAIN}`} onChange={e => saveTo(e.target.value)} /></label>
         {note && <p className="msg">{note}</p>}
         <div className="modal-act">
+          {x.sig && x.inp.signImg && <button className="primary" onClick={onPdf}>PDF unterschrieben laden</button>}
           {x.sig && <button className="ghost" onClick={onUnmark}>Unterschrift entfernen</button>}
           <button className="ghost" onClick={copy} disabled={!lk || !lk.url}>Link kopieren</button>
           {navigator.share && <button className="ghost" onClick={share} disabled={!lk || !lk.url}>Link teilen</button>}
@@ -2366,14 +2378,52 @@ function SigPad({ cvRef, onDraw }) {
   return <canvas ref={cvRef} className="sigpad" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />;
 }
 
-// Handy-Ansicht: Abrechnung prüfen, unterschreiben, signiertes PDF zurücksenden
+// PDF-Ansicht (pdf.js wird erst auf der Unterschriften-Seite nachgeladen)
+const PDFJS_V = '3.11.174';
+let pdfjsP = null;
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (!pdfjsP) pdfjsP = new Promise((res, rej) => {
+    const base = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_V}/`;
+    const t = setTimeout(() => { pdfjsP = null; rej(new Error('Zeitüberschreitung')); }, 12000);
+    const sc = document.createElement('script'); sc.src = base + 'pdf.min.js';
+    sc.onload = () => { clearTimeout(t); try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js'; res(window.pdfjsLib); } catch (e) { pdfjsP = null; rej(e); } };
+    sc.onerror = () => { clearTimeout(t); pdfjsP = null; rej(new Error('nicht geladen')); };
+    document.head.appendChild(sc);
+  });
+  return pdfjsP;
+}
+function PdfPages({ doc, onFail, onTap }) {
+  const host = useRef();
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const lib = await loadPdfJs();
+        const pdf = await lib.getDocument({ data: new Uint8Array(doc.output('arraybuffer')) }).promise;
+        const w = host.current.clientWidth || 360, px = Math.min(2000, w * Math.max(window.devicePixelRatio || 1, 1.5) * 1.3);
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const pg = await pdf.getPage(i); if (dead) return;
+          const v = pg.getViewport({ scale: px / pg.getViewport({ scale: 1 }).width });
+          const cv = document.createElement('canvas'); cv.width = Math.floor(v.width); cv.height = Math.floor(v.height);
+          await pg.render({ canvasContext: cv.getContext('2d'), viewport: v }).promise; if (dead) return;
+          const box = document.createElement('div'); box.className = 'pdfpage'; box.appendChild(cv); host.current.appendChild(box);
+          setReady(true);
+        }
+      } catch (e) { if (!dead) onFail(e); }
+    })();
+    return () => { dead = true; };
+  }, []);
+  return (<div className="pdfhost" onClick={onTap} role={onTap ? 'button' : undefined} aria-label={onTap ? 'Zum Unterschreiben tippen' : undefined}>
+    {!ready && <p className="empty" style={{ textAlign: 'center' }}>Lade Ansicht …</p>}
+    <div ref={host} />
+  </div>);
+}
+
+// Handy-Ansicht: Abrechnung als PDF ansehen, unterschreiben, teilen / automatisch zurücksenden
 function SignApp() {
   const [st, setSt] = useState({ phase: 'load' });
-  const [ok, setOk] = useState(false);
-  const [has, setHas] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
-  const cvRef = useRef();
   useEffect(() => { (async () => {
     try {
       const p = await unpackPayload(decodeURIComponent(location.hash.slice(3)));
@@ -2384,63 +2434,93 @@ function SignApp() {
   if (st.phase === 'load') return <div className="signwrap"><p className="empty">Lade Abrechnung …</p></div>;
   if (st.phase === 'error') return (<div className="signwrap"><h1>Provisionsabrechnung</h1><p className="err">{st.msg}</p><p className="empty">Bitte den QR-Code erneut scannen oder beim Vorgesetzten einen neuen Code anfordern.</p></div>);
   CUR = PROFILES[st.p.p];
-  const R = { ...CUR.core.DEFAULT_RULES, ...(st.p.r || {}) };
-  const inp = { ...CUR.BLANK, ...st.p.i };
+  return <SignView p={st.p} code={st.code} />;
+}
+
+function SignView({ p, code }) {
+  const R = { ...CUR.core.DEFAULT_RULES, ...(p.r || {}) };
+  const inp = { ...CUR.BLANK, ...p.i };
   const res = calc(inp, R);
   const pdfFor = extra => buildPdf(window.jspdf.jsPDF, { ...inp, datum: heute(), ...extra }, R);
-  const preview = () => { try { window.open(pdfFor({}).output('bloburl'), '_blank'); } catch (e) { setMsg('PDF-Vorschau nicht möglich: ' + e.message); } };
+  const plain = useMemo(() => pdfFor({}), []);
+  const [done, setDone] = useState(null);
+  const [open, setOpen] = useState(false);
+  const [ok, setOk] = useState(false);
+  const [has, setHas] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [fail, setFail] = useState(false);
+  const cvRef = useRef();
   const clearSig = () => { cvRef.current.getContext('2d').clearRect(0, 0, 900, 300); setHas(false); };
   async function sign() {
     setBusy(true); setMsg('');
     try {
       const now = new Date();
-      const note = `Digital unterschrieben am ${now.toLocaleDateString('de-DE')} um ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr · Prüfcode ${st.code}`;
+      const note = `Digital unterschrieben am ${now.toLocaleDateString('de-DE')} um ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr · Prüfcode ${code}`;
       const sc = document.createElement('canvas'); sc.width = 450; sc.height = 150;
       sc.getContext('2d').drawImage(cvRef.current, 0, 0, 450, 150);
       const img = sc.toDataURL('image/png');
+      // Die Unterschrift erscheint auf Seite 1 (Auszahlungsbetrag) und Seite 2 (Arbeitnehmer)
       const doc = pdfFor({ signImg: img, signNote: note });
       // Unterschrift zusätzlich als Metadaten im PDF: Das Dashboard liest sie daraus wieder ein
-      const sigMeta = { v: 1, f: st.p.p, s: inp.name, m: inp.monat, j: inp.jahr, c: st.code, t: res.total, a: now.toISOString(), d: heute(), i: img, n: note };
+      const sigMeta = { v: 1, f: p.p, s: inp.name, m: inp.monat, j: inp.jahr, c: code, t: res.total, a: now.toISOString(), d: heute(), i: img, n: note };
       doc.setProperties({ keywords: 'HETECSIG:' + b64uEnc(new TextEncoder().encode(JSON.stringify(sigMeta))) });
-      const q = st.p.q, viaRelay = !!(q && q.i && q.k && q.t && REPO_RE.test(q.r || ''));
-      setSt(s => ({ ...s, phase: 'done', up: viaRelay ? 'sending' : 'none', blob: doc.output('blob'), name: fname(inp, 'pdf').replace(/\.pdf$/, '_unterschrieben.pdf') }));
+      const q = p.q, viaRelay = !!(q && q.i && q.k && q.t && REPO_RE.test(q.r || ''));
+      setDone({ doc, up: viaRelay ? 'sending' : 'none', blob: doc.output('blob'), name: fname(inp, 'pdf').replace(/\.pdf$/, '_unterschrieben.pdf') });
+      setOpen(false); try { window.scrollTo(0, 0); } catch (_) {}
       if (viaRelay) {
-        try { await relayPut(q, sigMeta); setSt(s => ({ ...s, up: 'ok' })); }
-        catch (e) { setSt(s => ({ ...s, up: e.message === 'schon übermittelt' ? 'ok' : 'err' })); }
+        try { await relayPut(q, sigMeta); setDone(d => ({ ...d, up: 'ok' })); }
+        catch (e) { setDone(d => ({ ...d, up: e.message === 'schon übermittelt' ? 'ok' : 'err' })); }
       }
     } catch (e) { setMsg('Fehler beim Erstellen: ' + e.message); }
     setBusy(false);
   }
-  const save = () => download(st.blob, st.name);
+  const save = () => download(done.blob, done.name);
   async function share() {
-    const f = new File([st.blob], st.name, { type: 'application/pdf' });
+    const f = new File([done.blob], done.name, { type: 'application/pdf' });
     try {
-      if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: st.name, text: `Provisionsabrechnung ${inp.monat} ${inp.jahr}, unterschrieben` }); return; }
+      if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: done.name, text: `Provisionsabrechnung ${inp.monat} ${inp.jahr}, unterschrieben${p.t ? ' – bitte an ' + p.t : ''}` }); return; }
     } catch (e) { if (e && e.name === 'AbortError') return; }
     save();
   }
-  if (st.phase === 'done') return (
-    <div className="signwrap">
-      <h1>Unterschrieben ✓</h1>
-      {st.up === 'ok' ? <><p>Deine Unterschrift wurde übermittelt. Du musst nichts weiter tun.</p><button className="ghost full" onClick={save}>PDF-Kopie speichern</button></>
-        : st.up === 'sending' ? <p>Übermittle Unterschrift …</p>
-        : <>
-          <p>{st.up === 'err' ? 'Die Übermittlung hat nicht geklappt. ' : ''}Deine Unterschrift ist im PDF. Bitte schicke es jetzt zurück{st.p.t ? <> an <b>{st.p.t}</b></> : ' an deinen Vorgesetzten'}.</p>
-          <button className="primary full" onClick={share}>PDF senden / teilen</button>
-          <button className="ghost full" onClick={save}>PDF speichern</button></>}
-      <p className="empty">Prüfcode {st.code}</p>
-    </div>);
+  const openPlain = () => { try { window.open(plain.output('bloburl'), '_blank'); } catch (e) { setMsg('PDF-Vorschau nicht möglich: ' + e.message); } };
   return (
-    <div className="signwrap">
-      <h1>Provisionsabrechnung</h1>
-      <Sheet inp={inp} res={res} R={R} />
-      <button className="ghost full" onClick={preview}>Abrechnung und Zusatzvereinbarung als PDF ansehen</button>
-      <label className="check signcheck"><input type="checkbox" checked={ok} onChange={e => setOk(e.target.checked)} /> Ich habe die Abrechnung und die Zusatzvereinbarung gelesen und bin einverstanden.</label>
-      <div className="sigarea"><span>Hier unterschreiben</span><SigPad cvRef={cvRef} onDraw={setHas} /></div>
-      <div className="sigbtns"><button className="ghost" onClick={clearSig}>Löschen</button></div>
-      {msg && <p className="err">{msg}</p>}
-      <button className="primary full" onClick={sign} disabled={!ok || !has || busy}>{busy ? 'Erstelle PDF …' : 'Unterschreiben'}</button>
-      <small className="hint">Prüfcode {st.code}</small>
+    <div className="pdfview">
+      <div className="pv-top"><strong>{inp.vollerName || inp.name}</strong><span>Provision {inp.monat} {inp.jahr}</span></div>
+      {done ? (
+        <div className={'pv-banner ' + (done.up === 'err' ? 'warn' : 'ok')}>
+          <b>Unterschrieben ✓</b>
+          {done.up === 'ok' ? ' Deine Unterschrift wurde übermittelt. Du musst nichts weiter tun.'
+            : done.up === 'sending' ? ' Übermittle Unterschrift …'
+            : <>{done.up === 'err' ? ' Die automatische Übermittlung hat nicht geklappt.' : ''} Bitte jetzt über „Teilen“ zurücksenden{p.t ? <> an <b>{p.t}</b></> : ''}.</>}
+        </div>
+      ) : <div className="pv-hint">Abrechnung und Zusatzvereinbarung prüfen. Zum Unterschreiben auf das Dokument oder unten auf den Knopf tippen.</div>}
+      {fail ? (<div className="signwrap">
+        <Sheet inp={inp} res={res} R={R} />
+        {!done && <button className="ghost full" onClick={openPlain}>Abrechnung und Zusatzvereinbarung als PDF ansehen</button>}
+      </div>) : <PdfPages key={done ? 's' : 'u'} doc={done ? done.doc : plain} onFail={() => setFail(true)} onTap={done ? undefined : () => setOpen(true)} />}
+      {msg && !open && <p className="err" style={{ margin: '0 16px' }}>{msg}</p>}
+      <p className="empty" style={{ textAlign: 'center', fontSize: '.8rem' }}>Prüfcode {code}</p>
+      <div className="pv-bar"><div>
+        {done ? <>
+          <button className="primary" onClick={share}>Teilen</button>
+          <button className="ghost" onClick={save}>PDF speichern</button>
+        </> : <button className="primary" onClick={() => setOpen(true)}>Unterschreiben</button>}
+      </div></div>
+      {open && !done && (
+        <div className="pv-sheetbg" onClick={e => { if (e.target === e.currentTarget && !busy) setOpen(false); }}>
+          <div className="pv-sheet" role="dialog" aria-label="Unterschreiben">
+            <label className="check signcheck"><input type="checkbox" checked={ok} onChange={e => setOk(e.target.checked)} /> Ich habe die Abrechnung und die Zusatzvereinbarung gelesen und bin einverstanden.</label>
+            <div className="sigarea"><span>Hier unterschreiben</span><SigPad cvRef={cvRef} onDraw={setHas} /></div>
+            <p className="empty" style={{ margin: '8px 0 0', fontSize: '.82rem' }}>Die Unterschrift wird auf Seite 1 und Seite 2 eingesetzt.</p>
+            {msg && <p className="err">{msg}</p>}
+            <div className="pv-sheetbtns">
+              <button className="ghost" onClick={clearSig} disabled={busy}>Löschen</button>
+              <button className="ghost" onClick={() => setOpen(false)} disabled={busy}>Abbrechen</button>
+              <button className="primary" onClick={sign} disabled={!ok || !has || busy}>{busy ? 'Erstelle PDF …' : 'Unterschreiben'}</button>
+            </div>
+          </div>
+        </div>)}
     </div>
   );
 }
@@ -2568,7 +2648,7 @@ function App() {
         setSigReq(sigReqRef.current);
         relayDel(rl, rq, got.sha).catch(() => {});
         n++;
-        setMsg(`Unterschrift von ${s.s} eingegangen.`);
+        setMsg(`Unterschrift angekommen: ${s.s}.`);
       } catch (e) {}
     }
     if (!n && manual) setMsg('Noch keine neue Unterschrift eingegangen.');
@@ -2865,7 +2945,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
                   const pills = [];
                   if (x.include && x.todo.length) pills.push(['st-todo', 'Handlungsbedarf', 'Siehe Hinweis unter dem Namen']);
                   if (x.sent) pills.push([x.sentChanged ? 'st-warn' : 'st-sent', x.sentChanged ? `Versendet ${kurzDatum(x.sent.at)} · Betrag geändert` : `Versendet ${kurzDatum(x.sent.at)}`, `An ${x.sent.to} am ${new Date(x.sent.at).toLocaleString('de-DE')} · ${eur(x.sent.total)}`]);
-                  if (x.sig) pills.push([x.sigChanged ? 'st-warn' : 'st-sig', x.sigChanged ? `Unterschrieben ${kurzDatum(x.sig.at)} · Betrag geändert` : `Unterschrieben ${kurzDatum(x.sig.at)}`, `Unterschrift vom ${new Date(x.sig.at).toLocaleString('de-DE')} · ${eur(x.sig.total)}`]);
+                  if (x.sig) pills.push([x.sigChanged ? 'st-warn' : 'st-sig', x.sigChanged ? `Unterschrift angekommen ${kurzDatum(x.sig.at)} · Betrag geändert` : `Unterschrift angekommen ${kurzDatum(x.sig.at)}`, `Unterschrift vom ${new Date(x.sig.at).toLocaleString('de-DE')} · ${eur(x.sig.total)}`]);
                   if (!pills.length && x.include) pills.push(['st-ready', 'Bereit', '']);
                   return (
                     <React.Fragment key={x.e.sheet}>
@@ -2950,7 +3030,7 @@ ${chosen.map((x, k) => { const nm = String(x.inp.vollerName || x.e.sheet).trim()
         <MailDialog x={x} meta={meta} R={R} mailAddr={mailSet[x.e.sheet]} onClose={() => setMailDlg(null)}
           onSent={to => { setMailSet(m => ({ ...m, [x.e.sheet]: to })); patch(x.e.sheet, { sent: { at: new Date().toISOString(), to, total: x.res.total } }); recordMonth([x]); setMailDlg(null); setMsg(`E-Mail-Entwurf für ${x.inp.vollerName} erstellt – Datei öffnen, sie erscheint in Outlook.`); }} />); })()}
       {signDlg && (() => { const x = list.find(l => l.e.sheet === signDlg); if (!x) return null; return (
-        <SignDialog x={x} meta={meta} R={R} rq={relay && sigReq[key(x.e.sheet)] ? { ...sigReq[key(x.e.sheet)], r: relay.repo, t: relay.token } : null} relay={relay} onRelay={saveRelay} onClose={() => setSignDlg(null)}
+        <SignDialog onPdf={() => onePdf(x.inp)} x={x} meta={meta} R={R} rq={relay && sigReq[key(x.e.sheet)] ? { ...sigReq[key(x.e.sheet)], r: relay.repo, t: relay.token } : null} relay={relay} onRelay={saveRelay} onClose={() => setSignDlg(null)}
           onImport={async fs => { await importSigs(fs); setSignDlg(null); }}
           onPoll={() => pollSigs(true)}
           onUnmark={() => { patch(x.e.sheet, { sig: null }); const k = key(x.e.sheet); sigReqRef.current = Object.fromEntries(Object.entries(sigReqRef.current).filter(([z]) => z !== k)); setSigReq(sigReqRef.current); setSignDlg(null); }} />); })()}
